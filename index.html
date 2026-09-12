@@ -35,7 +35,7 @@
   .badge.hidden { background:#e2e2e2; color:#666; }
   .grid { display:flex; flex-wrap:wrap; gap:12px; }
   .thumb-card { width: 155px; background:#fbfaf5; border:1px solid var(--line); border-radius:10px; padding:8px; font-size:12px; position:relative; }
-  .thumb-card.pinned-card { border: 2px solid var(--accent); background:fff0f5; }
+  .thumb-card.pinned-card { border: 2px solid var(--accent); background:#fff0f5; }
   .thumb-card img { width:100%; border-radius:6px; display:block; margin-bottom:6px; background:#fff; cursor:pointer; transition:transform 0.1s; }
   .thumb-card img:hover { transform: scale(1.02); }
   .like-btn { background:#fff0f5; color:var(--accent); font-size:12px; padding:4px 10px; margin-top:4px; }
@@ -60,14 +60,13 @@
   .modal-close { position:absolute; top:8px; right:12px; background:none; border:none; font-size:24px; cursor:pointer; color:#333; }
 </style>
 
-<!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<!-- Supabase SDK 로드 -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <div id="app"><div class="card">불러오는 중...</div></div>
 
-<!-- 이미지 확대용 모달 -->
+<!-- 이미지 확대 모달 -->
 <div class="modal-overlay" id="imgModal" onclick="closeModal()">
   <div class="modal-content" onclick="event.stopPropagation()">
     <button class="modal-close" onclick="closeModal()">&times;</button>
@@ -77,20 +76,10 @@
 </div>
 
 <script>
-// Firebase 설정
-const firebaseConfig = {
-  apiKey: "AIzaSy...",
-  authDomain: "realtime-database-afa37.firebaseapp.com",
-  databaseURL: "https://realtime-database-afa37-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "realtime-database-afa37",
-  storageBucket: "realtime-database-afa37.firebasestorage.app",
-  messagingSenderId: "247834614695",
-  appId: "1:247834614695:web:...",
-  measurementId: "G-..."
-};
+const SUPABASE_URL = "https://usxaesuezcagnjrhngqt.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_vsJ3MIVQZ0jUgG_KfL0Njw_Eb6zfikC";
 
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const APP = document.getElementById('app');
 let pollTimer = null;
@@ -108,7 +97,6 @@ function genId(len){
 }
 function baseUrl(){ return location.href.split('#')[0]; }
 
-// 라이트박스 팝업
 function openModal(imgSrc, caption){
   document.getElementById('modalImg').src = imgSrc;
   document.getElementById('modalCaption').innerText = caption || '';
@@ -129,34 +117,75 @@ async function getVisitorId(){
   return visitorId;
 }
 
-// DB 핸들러
+// ---------------- Supabase DB 함수 ----------------
 async function loadGallery(id){
   try {
-    const snapshot = await db.ref('gallery/' + id).once('value');
-    return snapshot.val();
+    const { data, error } = await supabase.from('gallery').select('*').eq('id', id).single();
+    return error ? null : data;
   } catch(e){ return null; }
 }
+
 async function saveGallery(id, obj){
   try {
-    await db.ref('gallery/' + id).set(obj);
-    return true;
-  } catch(e){ return false; }
-}
-async function loadSubs(id){
-  try {
-    const snapshot = await db.ref('submissions/' + id).once('value');
-    const val = snapshot.val();
-    return val ? Object.values(val) : [];
-  } catch(e){ return []; }
-}
-async function saveSubs(id, arr){
-  const trimmed = arr.slice(-30);
-  try {
-    await db.ref('submissions/' + id).set(trimmed);
-    return true;
+    const { error } = await supabase.from('gallery').upsert({
+      id: id,
+      mode: obj.mode,
+      topic: obj.topic || ''
+    });
+    return !error;
   } catch(e){ return false; }
 }
 
+async function loadSubs(id){
+  try {
+    const { data, error } = await supabase.from('submissions').select('*').eq('gallery_id', id).order('created_at', { ascending: true });
+    if(error) return [];
+    return data.map(item => ({
+      ...item,
+      likedBy: item.liked_by || []
+    }));
+  } catch(e){ return []; }
+}
+
+async function addSub(id, item){
+  try {
+    const { error } = await supabase.from('submissions').insert({
+      id: item.id,
+      gallery_id: id,
+      author: item.author,
+      topic: item.topic || '',
+      image: item.image,
+      correct: item.correct || false,
+      pinned: item.pinned || false,
+      hidden: item.hidden || false,
+      likes: item.likes || 0,
+      liked_by: item.likedBy || []
+    });
+    return !error;
+  } catch(e){ return false; }
+}
+
+async function updateSub(item){
+  try {
+    const { error } = await supabase.from('submissions').update({
+      correct: item.correct,
+      pinned: item.pinned,
+      hidden: item.hidden,
+      likes: item.likes,
+      liked_by: item.likedBy
+    }).eq('id', item.id);
+    return !error;
+  } catch(e){ return false; }
+}
+
+async function deleteSub(sid){
+  try {
+    const { error } = await supabase.from('submissions').delete().eq('id', sid);
+    return !error;
+  } catch(e){ return false; }
+}
+
+// ---------------- 라우팅 ----------------
 function route(){
   if(pollTimer){ clearInterval(pollTimer); pollTimer = null; }
   const hash = location.hash.replace('#','');
@@ -184,8 +213,7 @@ async function renderHome(){
   `;
   document.getElementById('createBtn').onclick = async ()=>{
     const id = genId(8);
-    await saveGallery(id, { mode:'catchmind', topic:'', createdAt: Date.now() });
-    await saveSubs(id, []);
+    await saveGallery(id, { mode:'catchmind', topic:'' });
     localStorage.setItem('my-gallery-id', id);
     location.hash = 'owner='+id;
   };
@@ -302,7 +330,6 @@ async function renderOwner(id){
     if(!feed) return;
     if(subs.length===0){ feed.innerHTML = '<span class="small">아직 그림이 없어요. 방문자 링크를 공유해보세요!</span>'; return; }
     
-    // 고정된 그림 상단 정렬
     const sortedSubs = subs.slice().sort((a,b)=>(b.pinned?1:0) - (a.pinned?1:0));
 
     feed.innerHTML = sortedSubs.map(s=>`
@@ -322,7 +349,6 @@ async function renderOwner(id){
                <div class="msg"></div>`
         ) : `<span class="small">❤️ ${s.likes||0}</span>`}
         
-        <!-- 오너 전용 관리 버튼 -->
         <div class="admin-actions">
           <button class="ghost pinBtn">${s.pinned ? '📌 해제' : '📌 고정'}</button>
           <button class="ghost hideBtn">${s.hidden ? '👁️ 공개' : '🔒 비공개'}</button>
@@ -334,7 +360,6 @@ async function renderOwner(id){
     feed.querySelectorAll('.thumb-card').forEach(card=>{
       const sid = card.dataset.sid;
       
-      // 정답 입력
       const guessBtn = card.querySelector('.guessBtn');
       if(guessBtn){
         guessBtn.onclick = async ()=>{
@@ -346,7 +371,7 @@ async function renderOwner(id){
           if(!target) return;
           if(target.topic.trim().toLowerCase() === guessVal.toLowerCase()){
             target.correct = true;
-            await saveSubs(id, fresh);
+            await updateSub(target);
             msg.textContent = '정답이에요! 🎉'; msg.className='msg ok';
             setTimeout(refreshFeed, 600);
           } else {
@@ -355,26 +380,21 @@ async function renderOwner(id){
         };
       }
 
-      // 상단 고정 버튼
       card.querySelector('.pinBtn').onclick = async ()=>{
         const fresh = await loadSubs(id);
         const target = fresh.find(x=>x.id===sid);
-        if(target){ target.pinned = !target.pinned; await saveSubs(id, fresh); refreshFeed(); }
+        if(target){ target.pinned = !target.pinned; await updateSub(target); refreshFeed(); }
       };
 
-      // 비공개 버튼
       card.querySelector('.hideBtn').onclick = async ()=>{
         const fresh = await loadSubs(id);
         const target = fresh.find(x=>x.id===sid);
-        if(target){ target.hidden = !target.hidden; await saveSubs(id, fresh); refreshFeed(); }
+        if(target){ target.hidden = !target.hidden; await updateSub(target); refreshFeed(); }
       };
 
-      // 삭제 버튼
       card.querySelector('.deleteBtn').onclick = async ()=>{
         if(!confirm('이 그림을 정말 삭제할까요?')) return;
-        let fresh = await loadSubs(id);
-        fresh = fresh.filter(x=>x.id!==sid);
-        await saveSubs(id, fresh);
+        await deleteSub(sid);
         refreshFeed();
       };
     });
@@ -436,7 +456,6 @@ async function renderVisitor(id){
     const msg = document.getElementById('submitMsg');
     msg.textContent=''; 
     const fresh = await loadGallery(id);
-    const subs = await loadSubs(id);
     const image = canvas.toDataURL('image/jpeg', 0.7);
     const author = document.getElementById('authorName').value.trim() || '익명';
     localStorage.setItem('visitor-nickname', author);
@@ -444,13 +463,11 @@ async function renderVisitor(id){
     if(fresh.mode==='catchmind'){
       const topic = document.getElementById('secretTopic').value.trim();
       if(!topic){ msg.textContent='주제를 먼저 입력해주세요.'; msg.className='msg no'; return; }
-      subs.push({ id: genId(10), author, topic, image, correct:false, pinned:false, hidden:false, createdAt: Date.now() });
-      await saveSubs(id, subs);
+      await addSub(id, { id: genId(10), author, topic, image, correct:false, pinned:false, hidden:false });
       document.getElementById('secretTopic').value='';
     } else {
       if(!fresh.topic){ msg.textContent='아직 주제가 정해지지 않았어요.'; msg.className='msg no'; return; }
-      subs.push({ id: genId(10), author, image, likes:0, likedBy:[], pinned:false, hidden:false, createdAt: Date.now() });
-      await saveSubs(id, subs);
+      await addSub(id, { id: genId(10), author, image, likes:0, likedBy:[], pinned:false, hidden:false });
     }
     clearCanvas(canvas);
     msg.textContent = '제출 완료! 🎉'; msg.className='msg ok';
@@ -461,14 +478,12 @@ async function renderVisitor(id){
     const g2 = await loadGallery(id);
     let subs = await loadSubs(id);
     
-    // 방문자 화면에서는 비공개(hidden) 처리된 그림 제외
     subs = subs.filter(s=>!s.hidden);
 
     const feed = document.getElementById('subFeed');
     if(!feed) return;
     if(subs.length===0){ feed.innerHTML = '<span class="small">아직 그림이 없어요. 첫 그림을 그려보세요!</span>'; return; }
     
-    // 고정된 그림 상단 정렬
     const sortedSubs = subs.slice().sort((a,b)=>(b.pinned?1:0) - (a.pinned?1:0));
 
     if(g2.mode==='catchmind'){
@@ -505,7 +520,7 @@ async function renderVisitor(id){
           if(target.likedBy.includes(vId)) return;
           target.likedBy.push(vId);
           target.likes = (target.likes||0)+1;
-          await saveSubs(id, freshSubs);
+          await updateSub(target);
           refreshFeed();
         };
       });
