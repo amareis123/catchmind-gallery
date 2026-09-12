@@ -33,11 +33,12 @@
   .grid { display:flex; flex-wrap:wrap; gap:12px; }
   .thumb-card { width: 140px; background:#fbfaf5; border:1px solid var(--line); border-radius:10px; padding:8px; font-size:12px; }
   .thumb-card img { width:100%; border-radius:6px; display:block; margin-bottom:6px; background:#fff; }
-  .like-btn { background:#fff0f5; color:var(--accent); font-size:12px; padding:4px 10px; }
+  .like-btn { background:#fff0f5; color:var(--accent); font-size:12px; padding:4px 10px; margin-top:4px; }
   .mode-btn { padding:8px 14px; border-radius:10px; font-size:13px; }
   .mode-btn.off { background:#eee; color:#666; }
   .topbar { display:flex; justify-content:space-between; align-items:center; }
   .small { font-size:12px; color:#8a887d; }
+  .author { font-weight:bold; color:#444; margin-bottom:4px; display:block; }
   .guess-row { display:flex; gap:6px; margin-top:8px; }
   .msg { font-size:12px; margin-top:4px; }
   .msg.ok { color: var(--good); } .msg.no { color: var(--bad); }
@@ -52,7 +53,7 @@
 <body>
 <div id="app"><div class="card">불러오는 중...</div></div>
 <script>
-// 전달해주신 Firebase 설정 적용
+// Firebase 설정
 const firebaseConfig = {
   apiKey: "AIzaSy...",
   authDomain: "realtime-database-afa37.firebaseapp.com",
@@ -141,7 +142,7 @@ async function renderHome(){
     <div class="card">
       <h2>어떻게 작동하나요?</h2>
       <p class="small">① 갤러리를 만들면 두 개의 링크가 생겨요 — 나만 보는 <b>주인 링크</b>와 친구에게 공유할 <b>방문자 링크</b>.<br>
-      ② 방문자는 방문자 링크로 들어와 이름 없이(익명) 캔버스에 그림을 그려요.<br>
+      ② 방문자는 방문자 링크로 들어와 닉네임과 함께 캔버스에 그림을 그려요.<br>
       ③ <b>캐치마인드 모드</b>: 방문자가 몰래 주제를 정해 그림을 그리면, 나는 그림만 보고 주제를 맞혀요.<br>
       ④ <b>주제 모드</b>: 내가 주제를 미리 정해두면, 방문자들이 그 주제로 그리고 서로 좋아요를 눌러줘요.</p>
       <button id="createBtn">✏️ 내 갤러리 만들기</button>
@@ -262,13 +263,18 @@ async function renderOwner(id){
   };
 
   async function refreshFeed(){
+    // 입력창에 포커스가 가 있으면 자동 새로고침을 건너뛰어 입력창이 닫히지 않도록 방지
+    if(document.activeElement && document.activeElement.classList.contains('guessInput')) return;
+
     const subs = await loadSubs(id);
     const feed = document.getElementById('subFeed');
     if(!feed) return;
     if(subs.length===0){ feed.innerHTML = '<span class="small">아직 그림이 없어요. 방문자 링크를 공유해보세요!</span>'; return; }
+    
     if(gallery.mode==='catchmind'){
       feed.innerHTML = subs.slice().reverse().map(s=>`
         <div class="thumb-card" data-sid="${s.id}">
+          <span class="author">👤 ${escapeHtml(s.author || '익명')}</span>
           <img src="${s.image}">
           ${s.correct
             ? `<span class="badge correct">✅ 맞춤: ${escapeHtml(s.topic)}</span>`
@@ -305,6 +311,7 @@ async function renderOwner(id){
     } else {
       feed.innerHTML = subs.slice().reverse().map(s=>`
         <div class="thumb-card">
+          <span class="author">👤 ${escapeHtml(s.author || '익명')}</span>
           <img src="${s.image}">
           <span class="small">❤️ ${s.likes||0}</span>
         </div>
@@ -323,13 +330,18 @@ async function renderVisitor(id){
     return;
   }
   await getVisitorId();
+  const savedName = localStorage.getItem('visitor-nickname') || '';
+
   APP.innerHTML = `
     <div class="topbar"><h1>🎨 익명 그림 갤러리</h1><a class="home-link" href="#">내 갤러리도 만들기</a></div>
     ${gallery.mode==='catchmind' ? `
       <div class="card">
         <h2>🕵️ 캐치마인드 모드</h2>
         <p class="sub">주제를 몰래 정하고 그림을 그리면, 갤러리 주인이 맞혀볼 거예요!</p>
-        <input type="text" id="secretTopic" placeholder="이 그림의 주제 (예: 판다)">
+        <div class="row" style="margin-bottom:8px;">
+          <input type="text" id="authorName" placeholder="내 닉네임 (선택사항)" value="${escapeHtml(savedName)}">
+          <input type="text" id="secretTopic" placeholder="이 그림의 주제 (예: 판다)">
+        </div>
         <canvas id="draw"></canvas>
         ${brushControlsHtml()}
         <div class="row" style="margin-top:10px;">
@@ -340,6 +352,9 @@ async function renderVisitor(id){
     ` : `
       <div class="card">
         <h2>🎯 오늘의 주제: ${gallery.topic ? escapeHtml(gallery.topic) : '(아직 주인이 주제를 정하지 않았어요)'}</h2>
+        <div class="row" style="margin-bottom:8px;">
+          <input type="text" id="authorName" placeholder="내 닉네임 (선택사항)" value="${escapeHtml(savedName)}">
+        </div>
         <canvas id="draw"></canvas>
         ${brushControlsHtml()}
         <div class="row" style="margin-top:10px;">
@@ -362,15 +377,18 @@ async function renderVisitor(id){
     const fresh = await loadGallery(id);
     const subs = await loadSubs(id);
     const image = canvas.toDataURL('image/jpeg', 0.7);
+    const author = document.getElementById('authorName').value.trim() || '익명';
+    localStorage.setItem('visitor-nickname', author); // 입력한 닉네임 저장
+
     if(fresh.mode==='catchmind'){
       const topic = document.getElementById('secretTopic').value.trim();
       if(!topic){ msg.textContent='주제를 먼저 입력해주세요.'; msg.className='msg no'; return; }
-      subs.push({ id: genId(10), topic, image, correct:false, createdAt: Date.now() });
+      subs.push({ id: genId(10), author, topic, image, correct:false, createdAt: Date.now() });
       await saveSubs(id, subs);
       document.getElementById('secretTopic').value='';
     } else {
       if(!fresh.topic){ msg.textContent='아직 주제가 정해지지 않았어요.'; msg.className='msg no'; return; }
-      subs.push({ id: genId(10), image, likes:0, likedBy:[], createdAt: Date.now() });
+      subs.push({ id: genId(10), author, image, likes:0, likedBy:[], createdAt: Date.now() });
       await saveSubs(id, subs);
     }
     clearCanvas(canvas);
@@ -387,6 +405,7 @@ async function renderVisitor(id){
     if(g2.mode==='catchmind'){
       feed.innerHTML = subs.slice().reverse().map(s=>`
         <div class="thumb-card">
+          <span class="author">👤 ${escapeHtml(s.author || '익명')}</span>
           <img src="${s.image}">
           ${s.correct ? `<span class="badge correct">✅ 정답: ${escapeHtml(s.topic)}</span>` : `<span class="badge pending">🤔 맞히는 중</span>`}
         </div>
@@ -396,6 +415,7 @@ async function renderVisitor(id){
       feed.innerHTML = subs.slice().reverse().map(s=>{
         const liked = (s.likedBy||[]).includes(vId);
         return `<div class="thumb-card" data-sid="${s.id}">
+          <span class="author">👤 ${escapeHtml(s.author || '익명')}</span>
           <img src="${s.image}">
           <button class="like-btn" ${liked?'disabled':''}>${liked?'❤️ 좋아요 완료':'🤍 좋아요 ('+(s.likes||0)+')'}</button>
         </div>`;
