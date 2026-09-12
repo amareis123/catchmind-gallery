@@ -53,7 +53,6 @@
   .msg { font-size:12px; margin-top:4px; }
   .msg.ok { color: var(--good); } .msg.no { color: var(--bad); }
   a.home-link { color:#8a887d; font-size:12px; text-decoration:none; }
-  .footer-note { font-size:11px; color:#a6a396; margin-top: 24px; line-height:1.6; }
 
   /* 모달 */
   .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; justify-content:center; align-items:center; padding:20px; }
@@ -84,20 +83,20 @@
 
 <script>
 const SUPABASE_URL = "https://usxaesuezcagnjrhngqt.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzeGFlc3VlemNhZ25qcmhuZ3F0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyMTQ3NTgsImV4cCI6MjEwNDc5MDc1OH0.RSY-kBFmTDx72VkjuwlaT9_5sF1szG6OV2QoluFUdR0";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInRefiRefiRefiRefiRefiRefiRefiRefiRefiRefiRefiRefiRefiRefiRefiRefiRefiRefiRefi"; 
 
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzeGFlc3VlemNhZ25qcmhuZ3F0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyMTQ3NTgsImV4cCI6MjEwNDc5MDc1OH0.RSY-kBFmTDx72VkjuwlaT9_5sF1szG6OV2QoluFUdR0");
 
 const APP = document.getElementById('app');
 let pollTimer = null;
-let currentBrush = { color:'#26251f', size:4, tool:'brush' }; // tool: 'brush' | 'fill'
+let currentBrush = { color:'#26251f', opacity: 1.0, size:4, tool:'brush' };
 let drawing = false;
 let visitorId = null;
 
-// Undo / Redo 스택
+// 메모리 최적화된 Undo / Redo 스택 (ImageData 사용)
 let undoStack = [];
 let redoStack = [];
-const MAX_UNDO = 20;
+const MAX_UNDO = 12; // 메모리 보호를 위해 최대 스택 조정
 
 function escapeHtml(s){
   const d = document.createElement('div'); d.innerText = s == null ? '' : String(s); return d.innerHTML;
@@ -116,6 +115,16 @@ function openModal(imgSrc, caption){
 }
 function closeModal(){
   document.getElementById('imgModal').classList.remove('active');
+}
+
+function getRgbaColor(hex, opacity){
+  let c = hex.replace('#','');
+  if(c.length === 3) c = c.split('').map(x=>x+x).join('');
+  const num = parseInt(c, 16);
+  const r = (num >> 16) & 255;
+  const g = (num >> 8) & 255;
+  const b = num & 255;
+  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 }
 
 async function getVisitorId(){
@@ -223,7 +232,7 @@ async function renderHome(){
     <div class="card">
       <h2>어떻게 작동하나요?</h2>
       <p class="small">① 갤러리를 만들면 비밀 번호가 포함된 **관리자 링크**와 공유용 **방문자 링크**가 생깁니다.<br>
-      ② 방문자는 자유롭게 캔버스에 그림을 그리고, **실행 취소/페인트 채우기/색상 선택**을 지원합니다.<br>
+      ② 방문자는 자유롭게 캔버스에 그림을 그리고, **실행 취소/투명도/필압 감지/페인트 채우기**를 지원합니다.<br>
       ③ **도배 방지 시스템**과 **악성 유저 차단(밴) 기능**으로 안전하게 운영하세요.</p>
       <button id="createBtn">✏️ 내 갤러리 만들기</button>
     </div>
@@ -234,7 +243,6 @@ async function renderHome(){
     const ownerKey = genId(16);
     await saveGallery(id, { owner_key: ownerKey, mode:'catchmind', topic:'', banned_visitors:[] });
     
-    // 로컬스토리지 저장
     localStorage.setItem('my-gallery-id', id);
     localStorage.setItem('my-gallery-key', ownerKey);
     
@@ -250,57 +258,53 @@ async function renderHome(){
   }
 }
 
-// ---------------- 캔버스 엔진 (Undo, Redo, Fill) ----------------
+// ---------------- 고성능 최적화 캔버스 엔진 ----------------
 function saveState(canvas){
-  if(undoStack.length >= MAX_UNDO) undoStack.shift();
-  undoStack.push(canvas.toDataURL());
-  redoStack = []; // 새 작업 발생 시 Redo 초기화
+  const ctx = canvas.getContext('2d');
+  if(undoStack.length >= MAX_UNDO) undoStack.shift(); // 메모리 상한 초과 방지
+  undoStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+  redoStack = []; // 새 획을 그리면 redo 초기화
 }
 
 function undo(canvas){
-  if(undoStack.length === 0) return;
+  if(undoStack.length <= 1) return; // 초기 백그라운드 보존
   const ctx = canvas.getContext('2d');
-  redoStack.push(canvas.toDataURL());
-  const lastState = undoStack.pop();
-  const img = new Image();
-  img.onload = ()=>{ ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(img,0,0); };
-  img.src = lastState;
+  redoStack.push(undoStack.pop());
+  const prevState = undoStack[undoStack.length - 1];
+  ctx.putImageData(prevState, 0, 0);
 }
 
 function redo(canvas){
   if(redoStack.length === 0) return;
   const ctx = canvas.getContext('2d');
-  undoStack.push(canvas.toDataURL());
   const nextState = redoStack.pop();
-  const img = new Image();
-  img.onload = ()=>{ ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(img,0,0); };
-  img.src = nextState;
+  undoStack.push(nextState);
+  ctx.putImageData(nextState, 0, 0);
 }
 
-// Flood Fill (페인트 통) 알고리즘
-function floodFill(canvas, startX, startY, fillColorHex){
+function floodFill(canvas, startX, startY, fillColorRgba){
   const ctx = canvas.getContext('2d');
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const data = imgData.data;
   
-  // Hex to RGB
   const temp = document.createElement('div');
-  temp.style.color = fillColorHex;
+  temp.style.color = fillColorRgba;
   document.body.appendChild(temp);
-  const cs = window.getComputedStyle(temp).color.match(/\d+/g).map(Number);
+  const cs = window.getComputedStyle(temp).color.match(/[\d.]+/g).map(Number);
   document.body.removeChild(temp);
-  const fillR = cs[0], fillG = cs[1], fillB = cs[2], fillA = 255;
+  
+  const fillR = cs[0], fillG = cs[1], fillB = cs[2], fillA = Math.round((cs[3] !== undefined ? cs[3] : 1) * 255);
 
   const targetIdx = (Math.floor(startY) * canvas.width + Math.floor(startX)) * 4;
   const startR = data[targetIdx], startG = data[targetIdx+1], startB = data[targetIdx+2], startA = data[targetIdx+3];
 
-  if(startR === fillR && startG === fillG && startB === fillB && startA === fillA) return;
+  if(Math.abs(startR - fillR) < 5 && Math.abs(startG - fillG) < 5 && Math.abs(startB - fillB) < 5 && Math.abs(startA - fillA) < 5) return;
 
   function matchColor(idx){
-    return Math.abs(data[idx] - startR) < 30 &&
-           Math.abs(data[idx+1] - startG) < 30 &&
-           Math.abs(data[idx+2] - startB) < 30 &&
-           Math.abs(data[idx+3] - startA) < 30;
+    return Math.abs(data[idx] - startR) < 32 &&
+           Math.abs(data[idx+1] - startG) < 32 &&
+           Math.abs(data[idx+2] - startB) < 32 &&
+           Math.abs(data[idx+3] - startA) < 32;
   }
 
   const queue = [[Math.floor(startX), Math.floor(startY)]];
@@ -333,46 +337,78 @@ function setupCanvas(canvas){
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   
   undoStack = []; redoStack = [];
-  saveState(canvas); // Initial blank state
+  saveState(canvas); // 최초 하얀 백그라운드 저장
 
   let last = null;
+  let isRequestingFrame = false;
+
   function pos(e){
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width/rect.width, scaleY = canvas.height/rect.height;
-    const p = e.touches ? e.touches[0] : e;
-    return { x:(p.clientX-rect.left)*scaleX, y:(p.clientY-rect.top)*scaleY };
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return { 
+      x: (e.clientX - rect.left) * scaleX, 
+      y: (e.clientY - rect.top) * scaleY,
+      pressure: (e.pressure && e.pressure > 0 && e.pointerType === 'pen') ? e.pressure : 0.5
+    };
   }
 
   function start(e){
     e.preventDefault();
     const p = pos(e);
+    const activeColor = getRgbaColor(currentBrush.color, currentBrush.opacity);
+
     if(currentBrush.tool === 'fill'){
+      floodFill(canvas, p.x, p.y, activeColor);
       saveState(canvas);
-      floodFill(canvas, p.x, p.y, currentBrush.color);
       return;
     }
+
     drawing = true;
     last = p;
-    saveState(canvas);
   }
 
   function move(e){
-    if(!drawing || currentBrush.tool === 'fill') return; e.preventDefault();
+    if(!drawing || currentBrush.tool === 'fill') return; 
+    e.preventDefault();
     const p = pos(e);
-    ctx.strokeStyle = currentBrush.color; ctx.lineWidth = currentBrush.size;
-    ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke();
-    last = p;
+
+    // RequestAnimationFrame으로 브라우저 렌더링 주기에 동기화 (프레임 튕김 완벽 방지)
+    if(!isRequestingFrame){
+      isRequestingFrame = true;
+      requestAnimationFrame(()=>{
+        const activeColor = getRgbaColor(currentBrush.color, currentBrush.opacity);
+        ctx.strokeStyle = activeColor;
+        
+        let calculatedWidth = currentBrush.size;
+        if (e.pointerType === 'pen' && e.pressure > 0) {
+          calculatedWidth = currentBrush.size * (e.pressure * 2); 
+        }
+        ctx.lineWidth = Math.max(0.5, calculatedWidth);
+
+        ctx.beginPath(); 
+        ctx.moveTo(last.x, last.y); 
+        ctx.lineTo(p.x, p.y); 
+        ctx.stroke();
+        
+        last = p;
+        isRequestingFrame = false;
+      });
+    }
   }
-  function end(){ drawing=false; }
 
-  canvas.addEventListener('mousedown', start);
-  canvas.addEventListener('mousemove', move);
-  addEventListener('mouseup', end);
-  canvas.addEventListener('touchstart', start);
-  canvas.addEventListener('touchmove', move);
-  canvas.addEventListener('touchend', end);
+  function end(){ 
+    if(drawing){
+      drawing = false; 
+      saveState(canvas); // 획 작성이 끝난 직후 1회만 상태 저장
+    }
+  }
 
-  // 단축키 지원 (Ctrl+Z / Ctrl+Y)
+  canvas.addEventListener('pointerdown', start);
+  canvas.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', end);
+  window.addEventListener('pointercancel', end);
+
   window.onkeydown = (e)=>{
     if(e.ctrlKey || e.metaKey){
       if(e.key.toLowerCase() === 'z'){
@@ -386,9 +422,9 @@ function setupCanvas(canvas){
 }
 
 function clearCanvas(canvas){
-  saveState(canvas);
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  saveState(canvas);
 }
 
 function brushControlsHtml(){
@@ -405,8 +441,17 @@ function brushControlsHtml(){
       </div>
     </div>
     <div class="row" style="margin-top:8px;">
-      <span class="small">크기:</span>
-      <input type="range" min="1" max="24" value="4" id="brushSize" style="width:90px;">
+      <span class="small">굵기:</span>
+      <input type="range" min="1" max="50" value="4" id="brushSize" style="width:70px;">
+      <span class="small" id="brushSizeVal">4px</span>
+      
+      <div style="border-left:1px solid #ccc; height:16px; margin:0 4px;"></div>
+      
+      <span class="small">투명도:</span>
+      <input type="range" min="5" max="100" value="100" id="brushOpacity" style="width:70px;">
+      <span class="small" id="brushOpacityVal">100%</span>
+    </div>
+    <div class="row" style="margin-top:8px;">
       <button class="ghost" id="undoBtn" type="button" style="padding:4px 10px; font-size:12px;">↩️ 뒤로</button>
       <button class="ghost" id="redoBtn" type="button" style="padding:4px 10px; font-size:12px;">↪️ 다시</button>
       <button class="ghost" id="clearBtn" type="button" style="padding:4px 10px; font-size:12px; color:var(--bad);">🗑️ 초기화</button>
@@ -438,7 +483,21 @@ function bindBrushControls(scope){
     tFill.onclick = ()=>{ currentBrush.tool='fill'; tFill.classList.add('active'); tBrush.classList.remove('active'); };
   }
 
-  scope.querySelector('#brushSize').oninput = (e)=>{ currentBrush.size = parseInt(e.target.value); };
+  const bSize = scope.querySelector('#brushSize');
+  const bSizeVal = scope.querySelector('#brushSizeVal');
+  bSize.oninput = (e)=>{ 
+    currentBrush.size = parseInt(e.target.value); 
+    bSizeVal.textContent = `${currentBrush.size}px`;
+  };
+
+  const bOpacity = scope.querySelector('#brushOpacity');
+  const bOpacityVal = scope.querySelector('#brushOpacityVal');
+  bOpacity.oninput = (e)=>{
+    const val = parseInt(e.target.value);
+    currentBrush.opacity = val / 100;
+    bOpacityVal.textContent = `${val}%`;
+  };
+
   scope.querySelector('#undoBtn').onclick = ()=> undo(canvas);
   scope.querySelector('#redoBtn').onclick = ()=> redo(canvas);
   scope.querySelector('#clearBtn').onclick = ()=> clearCanvas(canvas);
@@ -447,7 +506,6 @@ function bindBrushControls(scope){
 // ---------------- 주인(관리자) 화면 ----------------
 async function renderOwner(id, key){
   const gallery = await loadGallery(id);
-  // 보안 검증 (owner_key 비교)
   if(!gallery || gallery.owner_key !== key){
     APP.innerHTML = `<div class="card">접근 권한이 없거나 존재하지 않는 관리자 링크입니다. <a class="home-link" href="#">홈으로</a></div>`;
     return;
@@ -505,7 +563,6 @@ async function renderOwner(id, key){
     const freshGallery = await loadGallery(id);
     const bannedArr = freshGallery ? (freshGallery.banned_visitors || []) : [];
     
-    // 밴 목록 렌더링
     const bannedBox = document.getElementById('bannedList');
     if(bannedBox){
       if(bannedArr.length === 0){
@@ -684,7 +741,6 @@ async function renderVisitor(id){
       const msg = document.getElementById('submitMsg');
       msg.textContent=''; 
 
-      // 도배 방지 (쿨다운 딜레이 30초)
       const lastSubTime = localStorage.getItem('last-sub-time');
       const now = Date.now();
       if(lastSubTime && (now - parseInt(lastSubTime)) < 30000){
@@ -779,7 +835,6 @@ async function renderVisitor(id){
   pollTimer = setInterval(refreshFeed, 3000);
 }
 
-// 앱 시작
 route();
 </script>
 </body>
