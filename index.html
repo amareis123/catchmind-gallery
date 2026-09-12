@@ -19,6 +19,7 @@
   button { font-family: inherit; cursor: pointer; border: none; border-radius: 10px; padding: 10px 16px; font-size: 14px; background: var(--accent); color: #fff; font-weight: 600; }
   button.secondary { background: var(--accent2); color:#1a3c40; }
   button.ghost { background: #eee; color: #444; }
+  button.danger { background: var(--bad); color: #fff; }
   button:disabled { opacity: 0.5; cursor: not-allowed; }
   input[type=text] { font-family: inherit; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line); font-size: 14px; width: 100%; }
   .row { display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
@@ -30,10 +31,16 @@
   .badge { display:inline-block; font-size:11px; padding:2px 8px; border-radius:20px; font-weight:700; }
   .badge.correct { background:#d9f3df; color: var(--good); }
   .badge.pending { background:#fff2d6; color:#a3760c; }
+  .badge.pinned { background:#ffe3ec; color:var(--accent); }
+  .badge.hidden { background:#e2e2e2; color:#666; }
   .grid { display:flex; flex-wrap:wrap; gap:12px; }
-  .thumb-card { width: 140px; background:#fbfaf5; border:1px solid var(--line); border-radius:10px; padding:8px; font-size:12px; }
-  .thumb-card img { width:100%; border-radius:6px; display:block; margin-bottom:6px; background:#fff; }
+  .thumb-card { width: 155px; background:#fbfaf5; border:1px solid var(--line); border-radius:10px; padding:8px; font-size:12px; position:relative; }
+  .thumb-card.pinned-card { border: 2px solid var(--accent); background:fff0f5; }
+  .thumb-card img { width:100%; border-radius:6px; display:block; margin-bottom:6px; background:#fff; cursor:pointer; transition:transform 0.1s; }
+  .thumb-card img:hover { transform: scale(1.02); }
   .like-btn { background:#fff0f5; color:var(--accent); font-size:12px; padding:4px 10px; margin-top:4px; }
+  .admin-actions { display:flex; gap:4px; margin-top:6px; flex-wrap:wrap; }
+  .admin-actions button { font-size:10px; padding:3px 6px; border-radius:6px; }
   .mode-btn { padding:8px 14px; border-radius:10px; font-size:13px; }
   .mode-btn.off { background:#eee; color:#666; }
   .topbar { display:flex; justify-content:space-between; align-items:center; }
@@ -44,14 +51,31 @@
   .msg.ok { color: var(--good); } .msg.no { color: var(--bad); }
   a.home-link { color:#8a887d; font-size:12px; text-decoration:none; }
   .footer-note { font-size:11px; color:#a6a396; margin-top: 24px; line-height:1.6; }
+
+  /* 이미지 확대 모달 라이트박스 */
+  .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; justify-content:center; align-items:center; padding:20px; }
+  .modal-overlay.active { display:flex; }
+  .modal-content { max-width:90%; max-height:90%; background:#fff; border-radius:12px; padding:16px; text-align:center; position:relative; }
+  .modal-content img { max-width:100%; max-height:70vh; border-radius:8px; display:block; margin:0 auto; }
+  .modal-close { position:absolute; top:8px; right:12px; background:none; border:none; font-size:24px; cursor:pointer; color:#333; }
 </style>
 
-<!-- Firebase SDK 라이브러리 로드 -->
+<!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 <body>
 <div id="app"><div class="card">불러오는 중...</div></div>
+
+<!-- 이미지 확대용 모달 -->
+<div class="modal-overlay" id="imgModal" onclick="closeModal()">
+  <div class="modal-content" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal()">&times;</button>
+    <img id="modalImg" src="">
+    <div id="modalCaption" style="margin-top:10px; font-weight:bold; font-size:14px;"></div>
+  </div>
+</div>
+
 <script>
 // Firebase 설정
 const firebaseConfig = {
@@ -65,7 +89,6 @@ const firebaseConfig = {
   measurementId: "G-..."
 };
 
-// Firebase 초기화
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
@@ -85,6 +108,16 @@ function genId(len){
 }
 function baseUrl(){ return location.href.split('#')[0]; }
 
+// 라이트박스 팝업
+function openModal(imgSrc, caption){
+  document.getElementById('modalImg').src = imgSrc;
+  document.getElementById('modalCaption').innerText = caption || '';
+  document.getElementById('imgModal').classList.add('active');
+}
+function closeModal(){
+  document.getElementById('imgModal').classList.remove('active');
+}
+
 async function getVisitorId(){
   if(visitorId) return visitorId;
   let stored = localStorage.getItem('visitor-id');
@@ -96,7 +129,7 @@ async function getVisitorId(){
   return visitorId;
 }
 
-// 데이터베이스 연동 함수
+// DB 핸들러
 async function loadGallery(id){
   try {
     const snapshot = await db.ref('gallery/' + id).once('value');
@@ -117,14 +150,13 @@ async function loadSubs(id){
   } catch(e){ return []; }
 }
 async function saveSubs(id, arr){
-  const trimmed = arr.slice(-24);
+  const trimmed = arr.slice(-30);
   try {
     await db.ref('submissions/' + id).set(trimmed);
     return true;
   } catch(e){ return false; }
 }
 
-// ---------------- 라우팅 ----------------
 function route(){
   if(pollTimer){ clearInterval(pollTimer); pollTimer = null; }
   const hash = location.hash.replace('#','');
@@ -263,7 +295,6 @@ async function renderOwner(id){
   };
 
   async function refreshFeed(){
-    // 입력창에 포커스가 가 있으면 자동 새로고침을 건너뛰어 입력창이 닫히지 않도록 방지
     if(document.activeElement && document.activeElement.classList.contains('guessInput')) return;
 
     const subs = await loadSubs(id);
@@ -271,12 +302,17 @@ async function renderOwner(id){
     if(!feed) return;
     if(subs.length===0){ feed.innerHTML = '<span class="small">아직 그림이 없어요. 방문자 링크를 공유해보세요!</span>'; return; }
     
-    if(gallery.mode==='catchmind'){
-      feed.innerHTML = subs.slice().reverse().map(s=>`
-        <div class="thumb-card" data-sid="${s.id}">
-          <span class="author">👤 ${escapeHtml(s.author || '익명')}</span>
-          <img src="${s.image}">
-          ${s.correct
+    // 고정된 그림 상단 정렬
+    const sortedSubs = subs.slice().sort((a,b)=>(b.pinned?1:0) - (a.pinned?1:0));
+
+    feed.innerHTML = sortedSubs.map(s=>`
+      <div class="thumb-card ${s.pinned ? 'pinned-card' : ''}" data-sid="${s.id}">
+        <span class="author">👤 ${escapeHtml(s.author || '익명')}</span>
+        ${s.pinned ? '<span class="badge pinned">📌 고정됨</span>' : ''}
+        ${s.hidden ? '<span class="badge hidden">🔒 비공개</span>' : ''}
+        <img src="${s.image}" onclick="openModal('${s.image}', '${escapeHtml(s.author || '익명')}님의 작품')">
+        ${gallery.mode==='catchmind' ? (
+          s.correct
             ? `<span class="badge correct">✅ 맞춤: ${escapeHtml(s.topic)}</span>`
             : `<span class="badge pending">🤔 맞히는 중</span>
                <div class="guess-row">
@@ -284,20 +320,30 @@ async function renderOwner(id){
                  <button class="guessBtn" style="padding:6px 10px; font-size:12px;">맞히기</button>
                </div>
                <div class="msg"></div>`
-          }
+        ) : `<span class="small">❤️ ${s.likes||0}</span>`}
+        
+        <!-- 오너 전용 관리 버튼 -->
+        <div class="admin-actions">
+          <button class="ghost pinBtn">${s.pinned ? '📌 해제' : '📌 고정'}</button>
+          <button class="ghost hideBtn">${s.hidden ? '👁️ 공개' : '🔒 비공개'}</button>
+          <button class="danger deleteBtn">🗑️ 삭제</button>
         </div>
-      `).join('');
-      feed.querySelectorAll('.thumb-card').forEach(card=>{
-        const btn = card.querySelector('.guessBtn');
-        if(!btn) return;
-        btn.onclick = async ()=>{
-          const sid = card.dataset.sid;
+      </div>
+    `).join('');
+
+    feed.querySelectorAll('.thumb-card').forEach(card=>{
+      const sid = card.dataset.sid;
+      
+      // 정답 입력
+      const guessBtn = card.querySelector('.guessBtn');
+      if(guessBtn){
+        guessBtn.onclick = async ()=>{
           const guessVal = card.querySelector('.guessInput').value.trim();
           const msg = card.querySelector('.msg');
           if(!guessVal) return;
           const fresh = await loadSubs(id);
           const target = fresh.find(x=>x.id===sid);
-          if(!target){ return; }
+          if(!target) return;
           if(target.topic.trim().toLowerCase() === guessVal.toLowerCase()){
             target.correct = true;
             await saveSubs(id, fresh);
@@ -307,16 +353,31 @@ async function renderOwner(id){
             msg.textContent = '아쉬워요, 다시 시도해보세요.'; msg.className='msg no';
           }
         };
-      });
-    } else {
-      feed.innerHTML = subs.slice().reverse().map(s=>`
-        <div class="thumb-card">
-          <span class="author">👤 ${escapeHtml(s.author || '익명')}</span>
-          <img src="${s.image}">
-          <span class="small">❤️ ${s.likes||0}</span>
-        </div>
-      `).join('');
-    }
+      }
+
+      // 상단 고정 버튼
+      card.querySelector('.pinBtn').onclick = async ()=>{
+        const fresh = await loadSubs(id);
+        const target = fresh.find(x=>x.id===sid);
+        if(target){ target.pinned = !target.pinned; await saveSubs(id, fresh); refreshFeed(); }
+      };
+
+      // 비공개 버튼
+      card.querySelector('.hideBtn').onclick = async ()=>{
+        const fresh = await loadSubs(id);
+        const target = fresh.find(x=>x.id===sid);
+        if(target){ target.hidden = !target.hidden; await saveSubs(id, fresh); refreshFeed(); }
+      };
+
+      // 삭제 버튼
+      card.querySelector('.deleteBtn').onclick = async ()=>{
+        if(!confirm('이 그림을 정말 삭제할까요?')) return;
+        let fresh = await loadSubs(id);
+        fresh = fresh.filter(x=>x.id!==sid);
+        await saveSubs(id, fresh);
+        refreshFeed();
+      };
+    });
   }
   refreshFeed();
   pollTimer = setInterval(refreshFeed, 3000);
@@ -378,17 +439,17 @@ async function renderVisitor(id){
     const subs = await loadSubs(id);
     const image = canvas.toDataURL('image/jpeg', 0.7);
     const author = document.getElementById('authorName').value.trim() || '익명';
-    localStorage.setItem('visitor-nickname', author); // 입력한 닉네임 저장
+    localStorage.setItem('visitor-nickname', author);
 
     if(fresh.mode==='catchmind'){
       const topic = document.getElementById('secretTopic').value.trim();
       if(!topic){ msg.textContent='주제를 먼저 입력해주세요.'; msg.className='msg no'; return; }
-      subs.push({ id: genId(10), author, topic, image, correct:false, createdAt: Date.now() });
+      subs.push({ id: genId(10), author, topic, image, correct:false, pinned:false, hidden:false, createdAt: Date.now() });
       await saveSubs(id, subs);
       document.getElementById('secretTopic').value='';
     } else {
       if(!fresh.topic){ msg.textContent='아직 주제가 정해지지 않았어요.'; msg.className='msg no'; return; }
-      subs.push({ id: genId(10), author, image, likes:0, likedBy:[], createdAt: Date.now() });
+      subs.push({ id: genId(10), author, image, likes:0, likedBy:[], pinned:false, hidden:false, createdAt: Date.now() });
       await saveSubs(id, subs);
     }
     clearCanvas(canvas);
@@ -398,30 +459,42 @@ async function renderVisitor(id){
 
   async function refreshFeed(){
     const g2 = await loadGallery(id);
-    const subs = await loadSubs(id);
+    let subs = await loadSubs(id);
+    
+    // 방문자 화면에서는 비공개(hidden) 처리된 그림 제외
+    subs = subs.filter(s=>!s.hidden);
+
     const feed = document.getElementById('subFeed');
     if(!feed) return;
     if(subs.length===0){ feed.innerHTML = '<span class="small">아직 그림이 없어요. 첫 그림을 그려보세요!</span>'; return; }
+    
+    // 고정된 그림 상단 정렬
+    const sortedSubs = subs.slice().sort((a,b)=>(b.pinned?1:0) - (a.pinned?1:0));
+
     if(g2.mode==='catchmind'){
-      feed.innerHTML = subs.slice().reverse().map(s=>`
-        <div class="thumb-card">
+      feed.innerHTML = sortedSubs.map(s=>`
+        <div class="thumb-card ${s.pinned ? 'pinned-card' : ''}">
           <span class="author">👤 ${escapeHtml(s.author || '익명')}</span>
-          <img src="${s.image}">
+          ${s.pinned ? '<span class="badge pinned">📌 고정됨</span>' : ''}
+          <img src="${s.image}" onclick="openModal('${s.image}', '${escapeHtml(s.author || '익명')}님의 작품')">
           ${s.correct ? `<span class="badge correct">✅ 정답: ${escapeHtml(s.topic)}</span>` : `<span class="badge pending">🤔 맞히는 중</span>`}
         </div>
       `).join('');
     } else {
       const vId = await getVisitorId();
-      feed.innerHTML = subs.slice().reverse().map(s=>{
+      feed.innerHTML = sortedSubs.map(s=>{
         const liked = (s.likedBy||[]).includes(vId);
-        return `<div class="thumb-card" data-sid="${s.id}">
+        return `<div class="thumb-card ${s.pinned ? 'pinned-card' : ''}" data-sid="${s.id}">
           <span class="author">👤 ${escapeHtml(s.author || '익명')}</span>
-          <img src="${s.image}">
+          ${s.pinned ? '<span class="badge pinned">📌 고정됨</span>' : ''}
+          <img src="${s.image}" onclick="openModal('${s.image}', '${escapeHtml(s.author || '익명')}님의 작품')">
           <button class="like-btn" ${liked?'disabled':''}>${liked?'❤️ 좋아요 완료':'🤍 좋아요 ('+(s.likes||0)+')'}</button>
         </div>`;
       }).join('');
+
       feed.querySelectorAll('.thumb-card').forEach(card=>{
         const btn = card.querySelector('.like-btn');
+        if(!btn) return;
         btn.onclick = async ()=>{
           const sid = card.dataset.sid;
           const vId = await getVisitorId();
