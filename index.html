@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>낙서 갤러리 - 캐치마인드</title>
+<title>낙서 갤러리 - 캐치마인드 Pro</title>
 <style>
   :root{
     --bg:#fef6e4; --card:#ffffff; --ink:#26251f; --accent:#f582ae; --accent2:#8bd3dd;
@@ -25,48 +25,55 @@
   .row { display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
   .link-box { display:flex; gap:6px; }
   .link-box input { flex:1; background:#f6f3ea; }
-  canvas { border-radius: 10px; border: 2px solid var(--line); background:#fff; touch-action: none; width:100%; max-width:480px; height:auto; display:block; }
-  .swatch { width:22px; height:22px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1px var(--line); cursor:pointer; }
-  .swatch.active { box-shadow: 0 0 0 2px var(--ink); }
+  canvas { border-radius: 10px; border: 2px solid var(--line); background:#fff; touch-action: none; width:100%; max-width:480px; height:auto; display:block; cursor: crosshair; }
+  .swatch { width:24px; height:24px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1px var(--line); cursor:pointer; display:inline-block; }
+  .swatch.active { box-shadow: 0 0 0 2px var(--ink); transform: scale(1.1); }
   .badge { display:inline-block; font-size:11px; padding:2px 8px; border-radius:20px; font-weight:700; }
   .badge.correct { background:#d9f3df; color: var(--good); }
   .badge.pending { background:#fff2d6; color:#a3760c; }
   .badge.pinned { background:#ffe3ec; color:var(--accent); }
   .badge.hidden { background:#e2e2e2; color:#666; }
+  .badge.banned { background:#ffdce0; color:var(--bad); }
   .grid { display:flex; flex-wrap:wrap; gap:12px; }
-  .thumb-card { width: 155px; background:#fbfaf5; border:1px solid var(--line); border-radius:10px; padding:8px; font-size:12px; position:relative; }
+  .thumb-card { width: 160px; background:#fbfaf5; border:1px solid var(--line); border-radius:10px; padding:8px; font-size:12px; position:relative; }
   .thumb-card.pinned-card { border: 2px solid var(--accent); background:#fff0f5; }
   .thumb-card img { width:100%; border-radius:6px; display:block; margin-bottom:6px; background:#fff; cursor:pointer; transition:transform 0.1s; }
   .thumb-card img:hover { transform: scale(1.02); }
-  .like-btn { background:#fff0f5; color:var(--accent); font-size:12px; padding:4px 10px; margin-top:4px; }
+  .like-btn { background:#fff0f5; color:var(--accent); font-size:12px; padding:4px 10px; margin-top:4px; border-radius:6px; }
   .admin-actions { display:flex; gap:4px; margin-top:6px; flex-wrap:wrap; }
   .admin-actions button { font-size:10px; padding:3px 6px; border-radius:6px; }
   .mode-btn { padding:8px 14px; border-radius:10px; font-size:13px; }
   .mode-btn.off { background:#eee; color:#666; }
+  .tool-btn { padding:6px 12px; font-size:12px; background:#eee; color:#333; }
+  .tool-btn.active { background:var(--ink); color:#fff; }
   .topbar { display:flex; justify-content:space-between; align-items:center; }
   .small { font-size:12px; color:#8a887d; }
-  .author { font-weight:bold; color:#444; margin-bottom:4px; display:block; }
+  .author { font-weight:bold; color:#444; margin-bottom:4px; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .guess-row { display:flex; gap:6px; margin-top:8px; }
   .msg { font-size:12px; margin-top:4px; }
   .msg.ok { color: var(--good); } .msg.no { color: var(--bad); }
   a.home-link { color:#8a887d; font-size:12px; text-decoration:none; }
   .footer-note { font-size:11px; color:#a6a396; margin-top: 24px; line-height:1.6; }
 
-  /* 이미지 확대 모달 */
+  /* 모달 */
   .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; justify-content:center; align-items:center; padding:20px; }
   .modal-overlay.active { display:flex; }
   .modal-content { max-width:90%; max-height:90%; background:#fff; border-radius:12px; padding:16px; text-align:center; position:relative; }
   .modal-content img { max-width:100%; max-height:70vh; border-radius:8px; display:block; margin:0 auto; }
   .modal-close { position:absolute; top:8px; right:12px; background:none; border:none; font-size:24px; cursor:pointer; color:#333; }
+  
+  .color-picker-wrapper { display:inline-flex; align-items:center; position:relative; cursor:pointer; }
+  .color-picker-wrapper input[type="color"] { opacity:0; width:26px; height:26px; position:absolute; cursor:pointer; left:0; top:0; }
+  .color-picker-btn { width:26px; height:26px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1px var(--line); display:inline-block; background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red); }
 </style>
 
-<!-- Supabase SDK 로드 -->
+<!-- Supabase SDK -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <div id="app"><div class="card">불러오는 중...</div></div>
 
-<!-- 이미지 확대 모달 -->
+<!-- 모달 -->
 <div class="modal-overlay" id="imgModal" onclick="closeModal()">
   <div class="modal-content" onclick="event.stopPropagation()">
     <button class="modal-close" onclick="closeModal()">&times;</button>
@@ -76,7 +83,6 @@
 </div>
 
 <script>
-// Supabase 설정 (변수 중복 선언 제거 완료)
 const SUPABASE_URL = "https://usxaesuezcagnjrhngqt.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzeGFlc3VlemNhZ25qcmhuZ3F0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyMTQ3NTgsImV4cCI6MjEwNDc5MDc1OH0.RSY-kBFmTDx72VkjuwlaT9_5sF1szG6OV2QoluFUdR0";
 
@@ -84,15 +90,20 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
 
 const APP = document.getElementById('app');
 let pollTimer = null;
-let currentBrush = { color:'#26251f', size:4 };
+let currentBrush = { color:'#26251f', size:4, tool:'brush' }; // tool: 'brush' | 'fill'
 let drawing = false;
 let visitorId = null;
+
+// Undo / Redo 스택
+let undoStack = [];
+let redoStack = [];
+const MAX_UNDO = 20;
 
 function escapeHtml(s){
   const d = document.createElement('div'); d.innerText = s == null ? '' : String(s); return d.innerHTML;
 }
 function genId(len){
-  const chars = 'abcdefghijkmnopqrstuvwxyz23456789';
+  const chars = 'abcdefghijkmnopqrstuvwxyz23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
   let s=''; for(let i=0;i<(len||8);i++) s += chars[Math.floor(Math.random()*chars.length)];
   return s;
 }
@@ -111,18 +122,19 @@ async function getVisitorId(){
   if(visitorId) return visitorId;
   let stored = localStorage.getItem('visitor-id');
   if(!stored){
-    stored = genId(10);
+    stored = genId(12);
     localStorage.setItem('visitor-id', stored);
   }
   visitorId = stored;
   return visitorId;
 }
 
-// ---------------- Supabase DB 연동 함수 ----------------
+// ---------------- Supabase 연동 ----------------
 async function loadGallery(id){
   try {
     const { data, error } = await supabaseClient.from('gallery').select('*').eq('id', id).single();
-    return error ? null : data;
+    if(error || !data) return null;
+    return { ...data, banned_visitors: data.banned_visitors || [] };
   } catch(e){ return null; }
 }
 
@@ -130,8 +142,10 @@ async function saveGallery(id, obj){
   try {
     const { error } = await supabaseClient.from('gallery').upsert({
       id: id,
+      owner_key: obj.owner_key,
       mode: obj.mode,
-      topic: obj.topic || ''
+      topic: obj.topic || '',
+      banned_visitors: obj.banned_visitors || []
     });
     return !error;
   } catch(e){ return false; }
@@ -150,6 +164,7 @@ async function loadSubs(id){
 
 async function addSub(id, item){
   try {
+    const vId = await getVisitorId();
     const { error } = await supabaseClient.from('submissions').insert({
       id: item.id,
       gallery_id: id,
@@ -160,7 +175,8 @@ async function addSub(id, item){
       pinned: item.pinned || false,
       hidden: item.hidden || false,
       likes: item.likes || 0,
-      liked_by: item.likedBy || []
+      liked_by: item.likedBy || [],
+      visitor_id: vId
     });
     return !error;
   } catch(e){ return false; }
@@ -186,53 +202,139 @@ async function deleteSub(sid){
   } catch(e){ return false; }
 }
 
-// ---------------- 라우팅 ----------------
+// ---------------- 라우터 ----------------
 function route(){
   if(pollTimer){ clearInterval(pollTimer); pollTimer = null; }
   const hash = location.hash.replace('#','');
-  if(hash.startsWith('owner=')) return renderOwner(hash.slice(6));
+  if(hash.startsWith('owner=')){
+    const parts = hash.slice(6).split('&key=');
+    return renderOwner(parts[0], parts[1]);
+  }
   if(hash.startsWith('visit=')) return renderVisitor(hash.slice(6));
   return renderHome();
 }
 addEventListener('hashchange', route);
 
-// ---------------- 홈 화면 ----------------
+// ---------------- 홈 ----------------
 async function renderHome(){
   APP.innerHTML = `
-    <h1>🎨 낙서 갤러리</h1>
-    <p class="sub">나만의 익명 그림 갤러리를 만들고 링크를 공유해보세요.</p>
+    <h1>🎨 낙서 갤러리 Pro</h1>
+    <p class="sub">나만의 보안 갤러리를 만들고 링크를 공유해보세요.</p>
     <div class="card">
       <h2>어떻게 작동하나요?</h2>
-      <p class="small">① 갤러리를 만들면 두 개의 링크가 생겨요 — 나만 보는 <b>주인 링크</b>와 친구에게 공유할 <b>방문자 링크</b>.<br>
-      ② 방문자는 방문자 링크로 들어와 닉네임과 함께 캔버스에 그림을 그려요.<br>
-      ③ <b>캐치마인드 모드</b>: 방문자가 몰래 주제를 정해 그림을 그리면, 나는 그림만 보고 주제를 맞혀요.<br>
-      ④ <b>주제 모드</b>: 내가 주제를 미리 정해두면, 방문자들이 그 주제로 그리고 서로 좋아요를 눌러줘요.</p>
+      <p class="small">① 갤러리를 만들면 비밀 번호가 포함된 **관리자 링크**와 공유용 **방문자 링크**가 생깁니다.<br>
+      ② 방문자는 자유롭게 캔버스에 그림을 그리고, **실행 취소/페인트 채우기/색상 선택**을 지원합니다.<br>
+      ③ **도배 방지 시스템**과 **악성 유저 차단(밴) 기능**으로 안전하게 운영하세요.</p>
       <button id="createBtn">✏️ 내 갤러리 만들기</button>
     </div>
     <div id="myGalleryBox"></div>
-    <div class="footer-note">그림과 좋아요, 정답 여부는 모든 사람에게 실시간 공유됩니다.</div>
   `;
   document.getElementById('createBtn').onclick = async ()=>{
     const id = genId(8);
-    await saveGallery(id, { mode:'catchmind', topic:'' });
+    const ownerKey = genId(16);
+    await saveGallery(id, { owner_key: ownerKey, mode:'catchmind', topic:'', banned_visitors:[] });
+    
+    // 로컬스토리지 저장
     localStorage.setItem('my-gallery-id', id);
-    location.hash = 'owner='+id;
+    localStorage.setItem('my-gallery-key', ownerKey);
+    
+    location.hash = `owner=${id}&key=${ownerKey}`;
   };
 
   const savedId = localStorage.getItem('my-gallery-id');
-  if(savedId){
+  const savedKey = localStorage.getItem('my-gallery-key');
+  if(savedId && savedKey){
     const box = document.getElementById('myGalleryBox');
     box.innerHTML = `<div class="card"><span class="small">이전에 만든 갤러리가 있어요.</span><br><button class="secondary" id="goMine" style="margin-top:6px;">내 갤러리로 이동</button></div>`;
-    document.getElementById('goMine').onclick = ()=>{ location.hash = 'owner='+savedId; };
+    document.getElementById('goMine').onclick = ()=>{ location.hash = `owner=${savedId}&key=${savedKey}`; };
   }
 }
 
-// ---------------- 캔버스 그리기 ----------------
+// ---------------- 캔버스 엔진 (Undo, Redo, Fill) ----------------
+function saveState(canvas){
+  if(undoStack.length >= MAX_UNDO) undoStack.shift();
+  undoStack.push(canvas.toDataURL());
+  redoStack = []; // 새 작업 발생 시 Redo 초기화
+}
+
+function undo(canvas){
+  if(undoStack.length === 0) return;
+  const ctx = canvas.getContext('2d');
+  redoStack.push(canvas.toDataURL());
+  const lastState = undoStack.pop();
+  const img = new Image();
+  img.onload = ()=>{ ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(img,0,0); };
+  img.src = lastState;
+}
+
+function redo(canvas){
+  if(redoStack.length === 0) return;
+  const ctx = canvas.getContext('2d');
+  undoStack.push(canvas.toDataURL());
+  const nextState = redoStack.pop();
+  const img = new Image();
+  img.onload = ()=>{ ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(img,0,0); };
+  img.src = nextState;
+}
+
+// Flood Fill (페인트 통) 알고리즘
+function floodFill(canvas, startX, startY, fillColorHex){
+  const ctx = canvas.getContext('2d');
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imgData.data;
+  
+  // Hex to RGB
+  const temp = document.createElement('div');
+  temp.style.color = fillColorHex;
+  document.body.appendChild(temp);
+  const cs = window.getComputedStyle(temp).color.match(/\d+/g).map(Number);
+  document.body.removeChild(temp);
+  const fillR = cs[0], fillG = cs[1], fillB = cs[2], fillA = 255;
+
+  const targetIdx = (Math.floor(startY) * canvas.width + Math.floor(startX)) * 4;
+  const startR = data[targetIdx], startG = data[targetIdx+1], startB = data[targetIdx+2], startA = data[targetIdx+3];
+
+  if(startR === fillR && startG === fillG && startB === fillB && startA === fillA) return;
+
+  function matchColor(idx){
+    return Math.abs(data[idx] - startR) < 30 &&
+           Math.abs(data[idx+1] - startG) < 30 &&
+           Math.abs(data[idx+2] - startB) < 30 &&
+           Math.abs(data[idx+3] - startA) < 30;
+  }
+
+  const queue = [[Math.floor(startX), Math.floor(startY)]];
+  const width = canvas.width;
+  const height = canvas.height;
+
+  while(queue.length > 0){
+    const [x, y] = queue.pop();
+    const idx = (y * width + x) * 4;
+
+    if(matchColor(idx)){
+      data[idx] = fillR;
+      data[idx+1] = fillG;
+      data[idx+2] = fillB;
+      data[idx+3] = fillA;
+
+      if(x > 0) queue.push([x - 1, y]);
+      if(x < width - 1) queue.push([x + 1, y]);
+      if(y > 0) queue.push([x, y - 1]);
+      if(y < height - 1) queue.push([x, y + 1]);
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
 function setupCanvas(canvas){
   const ctx = canvas.getContext('2d');
   canvas.width = 480; canvas.height = 360;
-  ctx.fillStyle = '#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height);
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  
+  undoStack = []; redoStack = [];
+  saveState(canvas); // Initial blank state
+
   let last = null;
   function pos(e){
     const rect = canvas.getBoundingClientRect();
@@ -240,57 +342,124 @@ function setupCanvas(canvas){
     const p = e.touches ? e.touches[0] : e;
     return { x:(p.clientX-rect.left)*scaleX, y:(p.clientY-rect.top)*scaleY };
   }
-  function start(e){ e.preventDefault(); drawing=true; last = pos(e); }
+
+  function start(e){
+    e.preventDefault();
+    const p = pos(e);
+    if(currentBrush.tool === 'fill'){
+      saveState(canvas);
+      floodFill(canvas, p.x, p.y, currentBrush.color);
+      return;
+    }
+    drawing = true;
+    last = p;
+    saveState(canvas);
+  }
+
   function move(e){
-    if(!drawing) return; e.preventDefault();
+    if(!drawing || currentBrush.tool === 'fill') return; e.preventDefault();
     const p = pos(e);
     ctx.strokeStyle = currentBrush.color; ctx.lineWidth = currentBrush.size;
     ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke();
     last = p;
   }
   function end(){ drawing=false; }
+
   canvas.addEventListener('mousedown', start);
   canvas.addEventListener('mousemove', move);
   addEventListener('mouseup', end);
   canvas.addEventListener('touchstart', start);
   canvas.addEventListener('touchmove', move);
   canvas.addEventListener('touchend', end);
+
+  // 단축키 지원 (Ctrl+Z / Ctrl+Y)
+  window.onkeydown = (e)=>{
+    if(e.ctrlKey || e.metaKey){
+      if(e.key.toLowerCase() === 'z'){
+        if(e.shiftKey) redo(canvas); else undo(canvas);
+      } else if(e.key.toLowerCase() === 'y'){
+        redo(canvas);
+      }
+    }
+  };
   return ctx;
 }
+
 function clearCanvas(canvas){
+  saveState(canvas);
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height);
 }
+
 function brushControlsHtml(){
   const colors = ['#26251f','#d9534f','#f582ae','#f0ad4e','#3aa655','#3a8fd9','#8b5aa8','#ffffff'];
   return `
-    <div class="row" style="margin-top:10px;">
+    <div class="row" style="margin-top:10px; gap:6px;">
+      <button type="button" class="tool-btn active" id="toolBrush">🖌️ 붓</button>
+      <button type="button" class="tool-btn" id="toolFill">🪣 채우기</button>
+      <div style="border-left:1px solid #ccc; height:20px; margin:0 4px;"></div>
       ${colors.map(c=>`<span class="swatch" data-color="${c}" style="background:${c}; ${c==='#ffffff'?'box-shadow:0 0 0 1px #ccc;':''}"></span>`).join('')}
-      <input type="range" min="1" max="16" value="4" id="brushSize" style="width:90px;">
-      <button class="ghost" id="clearBtn" type="button">지우기</button>
+      <div class="color-picker-wrapper" title="더 많은 색상 선택">
+        <span class="color-picker-btn"></span>
+        <input type="color" id="customColor" value="#26251f">
+      </div>
+    </div>
+    <div class="row" style="margin-top:8px;">
+      <span class="small">크기:</span>
+      <input type="range" min="1" max="24" value="4" id="brushSize" style="width:90px;">
+      <button class="ghost" id="undoBtn" type="button" style="padding:4px 10px; font-size:12px;">↩️ 뒤로</button>
+      <button class="ghost" id="redoBtn" type="button" style="padding:4px 10px; font-size:12px;">↪️ 다시</button>
+      <button class="ghost" id="clearBtn" type="button" style="padding:4px 10px; font-size:12px; color:var(--bad);">🗑️ 초기화</button>
     </div>`;
 }
+
 function bindBrushControls(scope){
+  const canvas = scope.querySelector('canvas');
   scope.querySelectorAll('.swatch').forEach(s=>{
-    s.onclick = ()=>{ currentBrush.color = s.dataset.color; scope.querySelectorAll('.swatch').forEach(x=>x.classList.remove('active')); s.classList.add('active'); };
+    s.onclick = ()=>{ 
+      currentBrush.color = s.dataset.color; 
+      scope.querySelectorAll('.swatch').forEach(x=>x.classList.remove('active')); 
+      s.classList.add('active'); 
+    };
   });
+
+  const customColor = scope.querySelector('#customColor');
+  if(customColor){
+    customColor.onchange = (e)=>{
+      currentBrush.color = e.target.value;
+      scope.querySelectorAll('.swatch').forEach(x=>x.classList.remove('active'));
+    };
+  }
+
+  const tBrush = scope.querySelector('#toolBrush');
+  const tFill = scope.querySelector('#toolFill');
+  if(tBrush && tFill){
+    tBrush.onclick = ()=>{ currentBrush.tool='brush'; tBrush.classList.add('active'); tFill.classList.remove('active'); };
+    tFill.onclick = ()=>{ currentBrush.tool='fill'; tFill.classList.add('active'); tBrush.classList.remove('active'); };
+  }
+
   scope.querySelector('#brushSize').oninput = (e)=>{ currentBrush.size = parseInt(e.target.value); };
-  scope.querySelector('#clearBtn').onclick = ()=>{ clearCanvas(scope.querySelector('canvas')); };
+  scope.querySelector('#undoBtn').onclick = ()=> undo(canvas);
+  scope.querySelector('#redoBtn').onclick = ()=> redo(canvas);
+  scope.querySelector('#clearBtn').onclick = ()=> clearCanvas(canvas);
 }
 
-// ---------------- 주인 화면 ----------------
-async function renderOwner(id){
+// ---------------- 주인(관리자) 화면 ----------------
+async function renderOwner(id, key){
   const gallery = await loadGallery(id);
-  if(!gallery){
-    APP.innerHTML = `<div class="card">존재하지 않는 갤러리예요. <a class="home-link" href="#">홈으로</a></div>`;
+  // 보안 검증 (owner_key 비교)
+  if(!gallery || gallery.owner_key !== key){
+    APP.innerHTML = `<div class="card">접근 권한이 없거나 존재하지 않는 관리자 링크입니다. <a class="home-link" href="#">홈으로</a></div>`;
     return;
   }
+
   const visitLink = baseUrl() + '#visit=' + id;
-  const ownerLink = baseUrl() + '#owner=' + id;
+  const ownerLink = baseUrl() + `#owner=${id}&key=${key}`;
+  
   APP.innerHTML = `
     <div class="topbar"><h1>🖼️ 내 갤러리 관리</h1><a class="home-link" href="#">홈</a></div>
     <div class="card">
-      <div class="small">🔒 주인 링크 (나만 보관)</div>
+      <div class="small">🔒 주인 비밀 관리자 링크 (절대 공유 금지)</div>
       <div class="link-box"><input type="text" readonly value="${ownerLink}"></div>
       <div class="small" style="margin-top:10px;">📎 방문자 공유 링크</div>
       <div class="link-box"><input type="text" readonly value="${visitLink}"><button class="secondary" id="copyBtn">복사</button></div>
@@ -309,22 +478,56 @@ async function renderOwner(id){
         <div class="small" style="margin-top:6px;">현재 주제: <b>${gallery.topic ? escapeHtml(gallery.topic) : '(아직 없음)'}</b></div>
       </div>
     </div>
+    
     <h2>${gallery.mode==='catchmind' ? '방문자들의 그림 — 주제를 맞혀보세요' : '방문자들의 작품'}</h2>
     <div id="subFeed" class="grid"><span class="small">불러오는 중...</span></div>
+
+    <div class="card" style="margin-top:20px;">
+      <h2>🚫 밴 목록 관리 (차단된 유저)</h2>
+      <div id="bannedList" class="small">차단된 유저가 없습니다.</div>
+    </div>
   `;
+
   document.getElementById('copyBtn').onclick = ()=>{
-    navigator.clipboard.writeText(visitLink).then(()=>alert('링크가 복사됐어요!')).catch(()=>{});
+    navigator.clipboard.writeText(visitLink).then(()=>alert('방문자 링크가 복사됐어요!')).catch(()=>{});
   };
-  document.getElementById('modeCatch').onclick = async ()=>{ gallery.mode='catchmind'; await saveGallery(id, gallery); renderOwner(id); };
-  document.getElementById('modeTopic').onclick = async ()=>{ gallery.mode='topic'; await saveGallery(id, gallery); renderOwner(id); };
+  document.getElementById('modeCatch').onclick = async ()=>{ gallery.mode='catchmind'; await saveGallery(id, gallery); renderOwner(id, key); };
+  document.getElementById('modeTopic').onclick = async ()=>{ gallery.mode='topic'; await saveGallery(id, gallery); renderOwner(id, key); };
   document.getElementById('setTopicBtn').onclick = async ()=>{
     const v = document.getElementById('topicInput').value.trim();
     if(!v) return;
-    gallery.topic = v; await saveGallery(id, gallery); renderOwner(id);
+    gallery.topic = v; await saveGallery(id, gallery); renderOwner(id, key);
   };
 
   async function refreshFeed(){
     if(document.activeElement && document.activeElement.classList.contains('guessInput')) return;
+
+    const freshGallery = await loadGallery(id);
+    const bannedArr = freshGallery ? (freshGallery.banned_visitors || []) : [];
+    
+    // 밴 목록 렌더링
+    const bannedBox = document.getElementById('bannedList');
+    if(bannedBox){
+      if(bannedArr.length === 0){
+        bannedBox.innerHTML = '<span class="small">차단된 플레이어가 없습니다.</span>';
+      } else {
+        bannedBox.innerHTML = bannedArr.map(vid=>`
+          <div class="row" style="margin-bottom:4px; justify-content:space-between; background:#fff0f5; padding:4px 8px; border-radius:6px;">
+            <span>🚫 ID: ${vid.slice(0,8)}...</span>
+            <button class="ghost unbanBtn" data-vid="${vid}" style="font-size:11px; padding:2px 6px;">밴 해제</button>
+          </div>
+        `).join('');
+
+        bannedBox.querySelectorAll('.unbanBtn').forEach(btn=>{
+          btn.onclick = async ()=>{
+            const vid = btn.dataset.vid;
+            freshGallery.banned_visitors = freshGallery.banned_visitors.filter(x=>x!==vid);
+            await saveGallery(id, freshGallery);
+            refreshFeed();
+          };
+        });
+      }
+    }
 
     const subs = await loadSubs(id);
     const feed = document.getElementById('subFeed');
@@ -333,11 +536,14 @@ async function renderOwner(id){
     
     const sortedSubs = subs.slice().sort((a,b)=>(b.pinned?1:0) - (a.pinned?1:0));
 
-    feed.innerHTML = sortedSubs.map(s=>`
-      <div class="thumb-card ${s.pinned ? 'pinned-card' : ''}" data-sid="${s.id}">
+    feed.innerHTML = sortedSubs.map(s=>{
+      const isBanned = bannedArr.includes(s.visitor_id);
+      return `
+      <div class="thumb-card ${s.pinned ? 'pinned-card' : ''}" data-sid="${s.id}" data-vid="${s.visitor_id}">
         <span class="author">👤 ${escapeHtml(s.author || '익명')}</span>
         ${s.pinned ? '<span class="badge pinned">📌 고정됨</span>' : ''}
         ${s.hidden ? '<span class="badge hidden">🔒 비공개</span>' : ''}
+        ${isBanned ? '<span class="badge banned">🚫 밴됨</span>' : ''}
         <img src="${s.image}" onclick="openModal('${s.image}', '${escapeHtml(s.author || '익명')}님의 작품')">
         ${gallery.mode==='catchmind' ? (
           s.correct
@@ -354,12 +560,14 @@ async function renderOwner(id){
           <button class="ghost pinBtn">${s.pinned ? '📌 해제' : '📌 고정'}</button>
           <button class="ghost hideBtn">${s.hidden ? '👁️ 공개' : '🔒 비공개'}</button>
           <button class="danger deleteBtn">🗑️ 삭제</button>
+          ${!isBanned ? `<button class="danger banBtn" style="background:#444;">🚫 밴</button>` : ''}
         </div>
       </div>
-    `).join('');
+    `}).join('');
 
     feed.querySelectorAll('.thumb-card').forEach(card=>{
       const sid = card.dataset.sid;
+      const vid = card.dataset.vid;
       
       const guessBtn = card.querySelector('.guessBtn');
       if(guessBtn){
@@ -398,6 +606,18 @@ async function renderOwner(id){
         await deleteSub(sid);
         refreshFeed();
       };
+
+      const banBtn = card.querySelector('.banBtn');
+      if(banBtn){
+        banBtn.onclick = async ()=>{
+          if(!confirm('이 유저를 정말 차단(밴)하시겠습니까?\n이 유저는 더 이상 그림을 올릴 수 없게 됩니다.')) return;
+          if(!freshGallery.banned_visitors.includes(vid)){
+            freshGallery.banned_visitors.push(vid);
+            await saveGallery(id, freshGallery);
+            refreshFeed();
+          }
+        };
+      }
     });
   }
   refreshFeed();
@@ -411,12 +631,18 @@ async function renderVisitor(id){
     APP.innerHTML = `<div class="card">존재하지 않는 갤러리예요. <a class="home-link" href="#">홈으로</a></div>`;
     return;
   }
-  await getVisitorId();
+  const myVid = await getVisitorId();
   const savedName = localStorage.getItem('visitor-nickname') || '';
+  const isBanned = (gallery.banned_visitors || []).includes(myVid);
 
   APP.innerHTML = `
     <div class="topbar"><h1>🎨 익명 그림 갤러리</h1><a class="home-link" href="#">내 갤러리도 만들기</a></div>
-    ${gallery.mode==='catchmind' ? `
+    ${isBanned ? `
+      <div class="card" style="background:#ffdce0; border-color:var(--bad);">
+        <h2 style="color:var(--bad); margin:0;">🚫 갤러리 이용이 제한되었습니다.</h2>
+        <p class="small" style="color:#555; margin-top:6px;">관리자에 의해 해당 갤러리에서 차단(밴) 처리되어 그림을 제출할 수 없습니다.</p>
+      </div>
+    ` : (gallery.mode==='catchmind' ? `
       <div class="card">
         <h2>🕵️ 캐치마인드 모드</h2>
         <p class="sub">주제를 몰래 정하고 그림을 그리면, 갤러리 주인이 맞혀볼 거예요!</p>
@@ -444,40 +670,59 @@ async function renderVisitor(id){
         </div>
         <div class="msg" id="submitMsg"></div>
       </div>
-    `}
+    `)}
     <h2>다른 사람들의 그림</h2>
     <div id="subFeed" class="grid"><span class="small">불러오는 중...</span></div>
   `;
-  const canvas = document.getElementById('draw');
-  setupCanvas(canvas);
-  bindBrushControls(document);
 
-  document.getElementById('submitBtn').onclick = async ()=>{
-    const msg = document.getElementById('submitMsg');
-    msg.textContent=''; 
-    const fresh = await loadGallery(id);
-    const image = canvas.toDataURL('image/jpeg', 0.7);
-    const author = document.getElementById('authorName').value.trim() || '익명';
-    localStorage.setItem('visitor-nickname', author);
+  if(!isBanned){
+    const canvas = document.getElementById('draw');
+    setupCanvas(canvas);
+    bindBrushControls(document);
 
-    if(fresh.mode==='catchmind'){
-      const topic = document.getElementById('secretTopic').value.trim();
-      if(!topic){ msg.textContent='주제를 먼저 입력해주세요.'; msg.className='msg no'; return; }
-      await addSub(id, { id: genId(10), author, topic, image, correct:false, pinned:false, hidden:false });
-      document.getElementById('secretTopic').value='';
-    } else {
-      if(!fresh.topic){ msg.textContent='아직 주제가 정해지지 않았어요.'; msg.className='msg no'; return; }
-      await addSub(id, { id: genId(10), author, image, likes:0, likedBy:[], pinned:false, hidden:false });
-    }
-    clearCanvas(canvas);
-    msg.textContent = '제출 완료! 🎉'; msg.className='msg ok';
-    refreshFeed();
-  };
+    document.getElementById('submitBtn').onclick = async ()=>{
+      const msg = document.getElementById('submitMsg');
+      msg.textContent=''; 
+
+      // 도배 방지 (쿨다운 딜레이 30초)
+      const lastSubTime = localStorage.getItem('last-sub-time');
+      const now = Date.now();
+      if(lastSubTime && (now - parseInt(lastSubTime)) < 30000){
+        const remain = Math.ceil((30000 - (now - parseInt(lastSubTime))) / 1000);
+        msg.textContent = `도배 방지: ${remain}초 후에 다시 제출할 수 있습니다.`;
+        msg.className = 'msg no';
+        return;
+      }
+
+      const fresh = await loadGallery(id);
+      if((fresh.banned_visitors||[]).includes(myVid)){
+        alert('차단된 계정입니다.'); location.reload(); return;
+      }
+
+      const image = canvas.toDataURL('image/jpeg', 0.7);
+      const author = document.getElementById('authorName').value.trim() || '익명';
+      localStorage.setItem('visitor-nickname', author);
+
+      if(fresh.mode==='catchmind'){
+        const topic = document.getElementById('secretTopic').value.trim();
+        if(!topic){ msg.textContent='주제를 먼저 입력해주세요.'; msg.className='msg no'; return; }
+        await addSub(id, { id: genId(10), author, topic, image, correct:false, pinned:false, hidden:false });
+        document.getElementById('secretTopic').value='';
+      } else {
+        if(!fresh.topic){ msg.textContent='아직 주제가 정해지지 않았어요.'; msg.className='msg no'; return; }
+        await addSub(id, { id: genId(10), author, image, likes:0, likedBy:[], pinned:false, hidden:false });
+      }
+      
+      localStorage.setItem('last-sub-time', Date.now().toString());
+      clearCanvas(canvas);
+      msg.textContent = '제출 완료! 🎉'; msg.className='msg ok';
+      refreshFeed();
+    };
+  }
 
   async function refreshFeed(){
     const g2 = await loadGallery(id);
     let subs = await loadSubs(id);
-    
     subs = subs.filter(s=>!s.hidden);
 
     const feed = document.getElementById('subFeed');
@@ -486,45 +731,49 @@ async function renderVisitor(id){
     
     const sortedSubs = subs.slice().sort((a,b)=>(b.pinned?1:0) - (a.pinned?1:0));
 
-    if(g2.mode==='catchmind'){
-      feed.innerHTML = sortedSubs.map(s=>`
-        <div class="thumb-card ${s.pinned ? 'pinned-card' : ''}">
-          <span class="author">👤 ${escapeHtml(s.author || '익명')}</span>
+    feed.innerHTML = sortedSubs.map(s=>{
+      const isMine = s.visitor_id === myVid;
+      return `
+        <div class="thumb-card ${s.pinned ? 'pinned-card' : ''}" data-sid="${s.id}">
+          <span class="author">👤 ${escapeHtml(s.author || '익명')} ${isMine?'(나)':''}</span>
           ${s.pinned ? '<span class="badge pinned">📌 고정됨</span>' : ''}
           <img src="${s.image}" onclick="openModal('${s.image}', '${escapeHtml(s.author || '익명')}님의 작품')">
-          ${s.correct ? `<span class="badge correct">✅ 정답: ${escapeHtml(s.topic)}</span>` : `<span class="badge pending">🤔 맞히는 중</span>`}
+          ${g2.mode==='catchmind' 
+            ? (s.correct ? `<span class="badge correct">✅ 정답: ${escapeHtml(s.topic)}</span>` : `<span class="badge pending">🤔 맞히는 중</span>`)
+            : `<button class="like-btn" data-sid="${s.id}">🤍 좋아요 (${s.likes||0})</button>`
+          }
+          ${isMine ? `<div class="admin-actions"><button class="danger myDeleteBtn">🗑️ 삭제</button></div>` : ''}
         </div>
-      `).join('');
-    } else {
-      const vId = await getVisitorId();
-      feed.innerHTML = sortedSubs.map(s=>{
-        const liked = (s.likedBy||[]).includes(vId);
-        return `<div class="thumb-card ${s.pinned ? 'pinned-card' : ''}" data-sid="${s.id}">
-          <span class="author">👤 ${escapeHtml(s.author || '익명')}</span>
-          ${s.pinned ? '<span class="badge pinned">📌 고정됨</span>' : ''}
-          <img src="${s.image}" onclick="openModal('${s.image}', '${escapeHtml(s.author || '익명')}님의 작품')">
-          <button class="like-btn" ${liked?'disabled':''}>${liked?'❤️ 좋아요 완료':'🤍 좋아요 ('+(s.likes||0)+')'}</button>
-        </div>`;
-      }).join('');
+      `;
+    }).join('');
 
-      feed.querySelectorAll('.thumb-card').forEach(card=>{
-        const btn = card.querySelector('.like-btn');
-        if(!btn) return;
-        btn.onclick = async ()=>{
-          const sid = card.dataset.sid;
-          const vId = await getVisitorId();
+    feed.querySelectorAll('.thumb-card').forEach(card=>{
+      const sid = card.dataset.sid;
+      
+      const myDelBtn = card.querySelector('.myDeleteBtn');
+      if(myDelBtn){
+        myDelBtn.onclick = async ()=>{
+          if(!confirm('내가 그린 그림을 삭제할까요?')) return;
+          await deleteSub(sid);
+          refreshFeed();
+        };
+      }
+
+      const likeBtn = card.querySelector('.like-btn');
+      if(likeBtn){
+        likeBtn.onclick = async ()=>{
           const freshSubs = await loadSubs(id);
           const target = freshSubs.find(x=>x.id===sid);
           if(!target) return;
           target.likedBy = target.likedBy || [];
-          if(target.likedBy.includes(vId)) return;
-          target.likedBy.push(vId);
+          if(target.likedBy.includes(myVid)) return;
+          target.likedBy.push(myVid);
           target.likes = (target.likes||0)+1;
           await updateSub(target);
           refreshFeed();
         };
-      });
-    }
+      }
+    });
   }
   refreshFeed();
   pollTimer = setInterval(refreshFeed, 3000);
