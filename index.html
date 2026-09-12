@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>낙서 갤러리 - 캐치마인드</title>
+<style>
+  :root{
+    --bg:#fef6e4; --card:#ffffff; --ink:#26251f; --accent:#f582ae; --accent2:#8bd3dd;
+    --accent3:#f3d2c1; --line:#e6dfd3; --good:#3aa655; --bad:#d9534f;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: 'Malgun Gothic', -apple-system, sans-serif; background: var(--bg); color: var(--ink); min-height:100vh; }
+  #app { max-width: 720px; margin: 0 auto; padding: 20px 16px 60px; }
+  h1 { font-size: 22px; margin: 6px 0 4px; }
+  h2 { font-size: 17px; margin: 18px 0 8px; }
+  p.sub { color:#6b6a63; font-size: 13px; margin-top:0; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); }
+  button { font-family: inherit; cursor: pointer; border: none; border-radius: 10px; padding: 10px 16px; font-size: 14px; background: var(--accent); color: #fff; font-weight: 600; }
+  button.secondary { background: var(--accent2); color:#1a3c40; }
+  button.ghost { background: #eee; color: #444; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  input[type=text] { font-family: inherit; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line); font-size: 14px; width: 100%; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
+  .link-box { display:flex; gap:6px; }
+  .link-box input { flex:1; background:#f6f3ea; }
+  canvas { border-radius: 10px; border: 2px solid var(--line); background:#fff; touch-action: none; width:100%; max-width:480px; height:auto; display:block; }
+  .swatch { width:22px; height:22px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1px var(--line); cursor:pointer; }
+  .swatch.active { box-shadow: 0 0 0 2px var(--ink); }
+  .badge { display:inline-block; font-size:11px; padding:2px 8px; border-radius:20px; font-weight:700; }
+  .badge.correct { background:#d9f3df; color: var(--good); }
+  .badge.pending { background:#fff2d6; color:#a3760c; }
+  .grid { display:flex; flex-wrap:wrap; gap:12px; }
+  .thumb-card { width: 140px; background:#fbfaf5; border:1px solid var(--line); border-radius:10px; padding:8px; font-size:12px; }
+  .thumb-card img { width:100%; border-radius:6px; display:block; margin-bottom:6px; background:#fff; }
+  .like-btn { background:#fff0f5; color:var(--accent); font-size:12px; padding:4px 10px; }
+  .mode-btn { padding:8px 14px; border-radius:10px; font-size:13px; }
+  .mode-btn.off { background:#eee; color:#666; }
+  .topbar { display:flex; justify-content:space-between; align-items:center; }
+  .small { font-size:12px; color:#8a887d; }
+  .guess-row { display:flex; gap:6px; margin-top:8px; }
+  .msg { font-size:12px; margin-top:4px; }
+  .msg.ok { color: var(--good); } .msg.no { color: var(--bad); }
+  a.home-link { color:#8a887d; font-size:12px; text-decoration:none; }
+  .footer-note { font-size:11px; color:#a6a396; margin-top: 24px; line-height:1.6; }
+</style>
+
+<!-- Firebase SDK 라이브러리 로드 -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+</head>
+<body>
+<div id="app"><div class="card">불러오는 중...</div></div>
+<script>
+// 전달해주신 Firebase 설정 적용
+const firebaseConfig = {
+  apiKey: "AIzaSy...",
+  authDomain: "realtime-database-afa37.firebaseapp.com",
+  databaseURL: "https://realtime-database-afa37-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "realtime-database-afa37",
+  storageBucket: "realtime-database-afa37.firebasestorage.app",
+  messagingSenderId: "247834614695",
+  appId: "1:247834614695:web:...",
+  measurementId: "G-..."
+};
+
+// Firebase 초기화
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+const APP = document.getElementById('app');
+let pollTimer = null;
+let currentBrush = { color:'#26251f', size:4 };
+let drawing = false;
+let visitorId = null;
+
+function escapeHtml(s){
+  const d = document.createElement('div'); d.innerText = s == null ? '' : String(s); return d.innerHTML;
+}
+function genId(len){
+  const chars = 'abcdefghijkmnopqrstuvwxyz23456789';
+  let s=''; for(let i=0;i<(len||8);i++) s += chars[Math.floor(Math.random()*chars.length)];
+  return s;
+}
+function baseUrl(){ return location.href.split('#')[0]; }
+
+async function getVisitorId(){
+  if(visitorId) return visitorId;
+  let stored = localStorage.getItem('visitor-id');
+  if(!stored){
+    stored = genId(10);
+    localStorage.setItem('visitor-id', stored);
+  }
+  visitorId = stored;
+  return visitorId;
+}
+
+// 데이터베이스 연동 함수
+async function loadGallery(id){
+  try {
+    const snapshot = await db.ref('gallery/' + id).once('value');
+    return snapshot.val();
+  } catch(e){ return null; }
+}
+async function saveGallery(id, obj){
+  try {
+    await db.ref('gallery/' + id).set(obj);
+    return true;
+  } catch(e){ return false; }
+}
+async function loadSubs(id){
+  try {
+    const snapshot = await db.ref('submissions/' + id).once('value');
+    const val = snapshot.val();
+    return val ? Object.values(val) : [];
+  } catch(e){ return []; }
+}
+async function saveSubs(id, arr){
+  const trimmed = arr.slice(-24);
+  try {
+    await db.ref('submissions/' + id).set(trimmed);
+    return true;
+  } catch(e){ return false; }
+}
+
+// ---------------- 라우팅 ----------------
+function route(){
+  if(pollTimer){ clearInterval(pollTimer); pollTimer = null; }
+  const hash = location.hash.replace('#','');
+  if(hash.startsWith('owner=')) return renderOwner(hash.slice(6));
+  if(hash.startsWith('visit=')) return renderVisitor(hash.slice(6));
+  return renderHome();
+}
+addEventListener('hashchange', route);
+
+// ---------------- 홈 ----------------
+async function renderHome(){
+  APP.innerHTML = `
+    <h1>🎨 낙서 갤러리</h1>
+    <p class="sub">나만의 익명 그림 갤러리를 만들고 링크를 공유해보세요.</p>
+    <div class="card">
+      <h2>어떻게 작동하나요?</h2>
+      <p class="small">① 갤러리를 만들면 두 개의 링크가 생겨요 — 나만 보는 <b>주인 링크</b>와 친구에게 공유할 <b>방문자 링크</b>.<br>
+      ② 방문자는 방문자 링크로 들어와 이름 없이(익명) 캔버스에 그림을 그려요.<br>
+      ③ <b>캐치마인드 모드</b>: 방문자가 몰래 주제를 정해 그림을 그리면, 나는 그림만 보고 주제를 맞혀요.<br>
+      ④ <b>주제 모드</b>: 내가 주제를 미리 정해두면, 방문자들이 그 주제로 그리고 서로 좋아요를 눌러줘요.</p>
+      <button id="createBtn">✏️ 내 갤러리 만들기</button>
+    </div>
+    <div id="myGalleryBox"></div>
+    <div class="footer-note">그림과 좋아요, 정답 여부는 이 사이트를 여는 모든 사람에게 공유되는 데이터로 저장돼요. 민감한 개인정보는 그리지 말아주세요.</div>
+  `;
+  document.getElementById('createBtn').onclick = async ()=>{
+    const id = genId(8);
+    await saveGallery(id, { mode:'catchmind', topic:'', createdAt: Date.now() });
+    await saveSubs(id, []);
+    localStorage.setItem('my-gallery-id', id);
+    location.hash = 'owner='+id;
+  };
+
+  const savedId = localStorage.getItem('my-gallery-id');
+  if(savedId){
+    const box = document.getElementById('myGalleryBox');
+    box.innerHTML = `<div class="card"><span class="small">이전에 만든 갤러리가 있어요.</span><br><button class="secondary" id="goMine">내 갤러리로 이동</button></div>`;
+    document.getElementById('goMine').onclick = ()=>{ location.hash = 'owner='+savedId; };
+  }
+}
+
+// ---------------- 캔버스 위젯 ----------------
+function setupCanvas(canvas){
+  const ctx = canvas.getContext('2d');
+  canvas.width = 480; canvas.height = 360;
+  ctx.fillStyle = '#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  let last = null;
+  function pos(e){
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width/rect.width, scaleY = canvas.height/rect.height;
+    const p = e.touches ? e.touches[0] : e;
+    return { x:(p.clientX-rect.left)*scaleX, y:(p.clientY-rect.top)*scaleY };
+  }
+  function start(e){ e.preventDefault(); drawing=true; last = pos(e); }
+  function move(e){
+    if(!drawing) return; e.preventDefault();
+    const p = pos(e);
+    ctx.strokeStyle = currentBrush.color; ctx.lineWidth = currentBrush.size;
+    ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke();
+    last = p;
+  }
+  function end(){ drawing=false; }
+  canvas.addEventListener('mousedown', start);
+  canvas.addEventListener('mousemove', move);
+  addEventListener('mouseup', end);
+  canvas.addEventListener('touchstart', start);
+  canvas.addEventListener('touchmove', move);
+  canvas.addEventListener('touchend', end);
+  return ctx;
+}
+function clearCanvas(canvas){
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+}
+function brushControlsHtml(){
+  const colors = ['#26251f','#d9534f','#f582ae','#f0ad4e','#3aa655','#3a8fd9','#8b5aa8','#ffffff'];
+  return `
+    <div class="row" style="margin-top:10px;">
+      ${colors.map(c=>`<span class="swatch" data-color="${c}" style="background:${c}; ${c==='#ffffff'?'box-shadow:0 0 0 1px #ccc;':''}"></span>`).join('')}
+      <input type="range" min="1" max="16" value="4" id="brushSize" style="width:90px;">
+      <button class="ghost" id="clearBtn" type="button">지우기</button>
+    </div>`;
+}
+function bindBrushControls(scope){
+  scope.querySelectorAll('.swatch').forEach(s=>{
+    s.onclick = ()=>{ currentBrush.color = s.dataset.color; scope.querySelectorAll('.swatch').forEach(x=>x.classList.remove('active')); s.classList.add('active'); };
+  });
+  scope.querySelector('#brushSize').oninput = (e)=>{ currentBrush.size = parseInt(e.target.value); };
+  scope.querySelector('#clearBtn').onclick = ()=>{ clearCanvas(scope.querySelector('canvas')); };
+}
+
+// ---------------- 주인(오너) 화면 ----------------
+async function renderOwner(id){
+  const gallery = await loadGallery(id);
+  if(!gallery){
+    APP.innerHTML = `<div class="card">존재하지 않는 갤러리예요. <a class="home-link" href="#">홈으로</a></div>`;
+    return;
+  }
+  const visitLink = baseUrl() + '#visit=' + id;
+  const ownerLink = baseUrl() + '#owner=' + id;
+  APP.innerHTML = `
+    <div class="topbar"><h1>🖼️ 내 갤러리 관리</h1><a class="home-link" href="#">홈</a></div>
+    <div class="card">
+      <div class="small">🔒 주인 링크 (나만 보관, 공유 금지)</div>
+      <div class="link-box"><input type="text" readonly value="${ownerLink}" id="ownerLinkInput"></div>
+      <div class="small" style="margin-top:10px;">📎 방문자 공유 링크</div>
+      <div class="link-box"><input type="text" readonly value="${visitLink}" id="visitLinkInput"><button class="secondary" id="copyBtn">복사</button></div>
+    </div>
+    <div class="card">
+      <h2>모드 선택</h2>
+      <div class="row">
+        <button class="mode-btn ${gallery.mode==='catchmind'?'':'off'}" id="modeCatch">🕵️ 캐치마인드 모드</button>
+        <button class="mode-btn ${gallery.mode==='topic'?'':'off'}" id="modeTopic">🎯 주제 모드</button>
+      </div>
+      <div id="topicSetter" style="margin-top:10px; ${gallery.mode==='topic'?'':'display:none;'}">
+        <div class="row">
+          <input type="text" id="topicInput" placeholder="오늘의 주제를 입력하세요 (예: 여름 바다)" value="${escapeHtml(gallery.topic||'')}">
+          <button id="setTopicBtn">주제 설정</button>
+        </div>
+        <div class="small" style="margin-top:6px;">현재 주제: <b>${gallery.topic ? escapeHtml(gallery.topic) : '(아직 없음)'}</b></div>
+      </div>
+    </div>
+    <h2>${gallery.mode==='catchmind' ? '방문자들의 그림 — 주제를 맞혀보세요' : '방문자들의 작품'}</h2>
+    <div id="subFeed" class="grid"><span class="small">불러오는 중...</span></div>
+  `;
+  document.getElementById('copyBtn').onclick = ()=>{
+    navigator.clipboard.writeText(visitLink).then(()=>alert('링크가 복사됐어요!')).catch(()=>{});
+  };
+  document.getElementById('modeCatch').onclick = async ()=>{ gallery.mode='catchmind'; await saveGallery(id, gallery); renderOwner(id); };
+  document.getElementById('modeTopic').onclick = async ()=>{ gallery.mode='topic'; await saveGallery(id, gallery); renderOwner(id); };
+  document.getElementById('setTopicBtn').onclick = async ()=>{
+    const v = document.getElementById('topicInput').value.trim();
+    if(!v) return;
+    gallery.topic = v; await saveGallery(id, gallery); renderOwner(id);
+  };
+
+  async function refreshFeed(){
+    const subs = await loadSubs(id);
+    const feed = document.getElementById('subFeed');
+    if(!feed) return;
+    if(subs.length===0){ feed.innerHTML = '<span class="small">아직 그림이 없어요. 방문자 링크를 공유해보세요!</span>'; return; }
+    if(gallery.mode==='catchmind'){
+      feed.innerHTML = subs.slice().reverse().map(s=>`
+        <div class="thumb-card" data-sid="${s.id}">
+          <img src="${s.image}">
+          ${s.correct
+            ? `<span class="badge correct">✅ 맞춤: ${escapeHtml(s.topic)}</span>`
+            : `<span class="badge pending">🤔 맞히는 중</span>
+               <div class="guess-row">
+                 <input type="text" placeholder="정답 입력" class="guessInput" style="font-size:12px; padding:6px;">
+                 <button class="guessBtn" style="padding:6px 10px; font-size:12px;">맞히기</button>
+               </div>
+               <div class="msg"></div>`
+          }
+        </div>
+      `).join('');
+      feed.querySelectorAll('.thumb-card').forEach(card=>{
+        const btn = card.querySelector('.guessBtn');
+        if(!btn) return;
+        btn.onclick = async ()=>{
+          const sid = card.dataset.sid;
+          const guessVal = card.querySelector('.guessInput').value.trim();
+          const msg = card.querySelector('.msg');
+          if(!guessVal) return;
+          const fresh = await loadSubs(id);
+          const target = fresh.find(x=>x.id===sid);
+          if(!target){ return; }
+          if(target.topic.trim().toLowerCase() === guessVal.toLowerCase()){
+            target.correct = true;
+            await saveSubs(id, fresh);
+            msg.textContent = '정답이에요! 🎉'; msg.className='msg ok';
+            setTimeout(refreshFeed, 600);
+          } else {
+            msg.textContent = '아쉬워요, 다시 시도해보세요.'; msg.className='msg no';
+          }
+        };
+      });
+    } else {
+      feed.innerHTML = subs.slice().reverse().map(s=>`
+        <div class="thumb-card">
+          <img src="${s.image}">
+          <span class="small">❤️ ${s.likes||0}</span>
+        </div>
+      `).join('');
+    }
+  }
+  refreshFeed();
+  pollTimer = setInterval(refreshFeed, 3000);
+}
+
+// ---------------- 방문자 화면 ----------------
+async function renderVisitor(id){
+  const gallery = await loadGallery(id);
+  if(!gallery){
+    APP.innerHTML = `<div class="card">존재하지 않는 갤러리예요. <a class="home-link" href="#">홈으로</a></div>`;
+    return;
+  }
+  await getVisitorId();
+  APP.innerHTML = `
+    <div class="topbar"><h1>🎨 익명 그림 갤러리</h1><a class="home-link" href="#">내 갤러리도 만들기</a></div>
+    ${gallery.mode==='catchmind' ? `
+      <div class="card">
+        <h2>🕵️ 캐치마인드 모드</h2>
+        <p class="sub">주제를 몰래 정하고 그림을 그리면, 갤러리 주인이 맞혀볼 거예요!</p>
+        <input type="text" id="secretTopic" placeholder="이 그림의 주제 (예: 판다)">
+        <canvas id="draw"></canvas>
+        ${brushControlsHtml()}
+        <div class="row" style="margin-top:10px;">
+          <button id="submitBtn">제출하기</button>
+        </div>
+        <div class="msg" id="submitMsg"></div>
+      </div>
+    ` : `
+      <div class="card">
+        <h2>🎯 오늘의 주제: ${gallery.topic ? escapeHtml(gallery.topic) : '(아직 주인이 주제를 정하지 않았어요)'}</h2>
+        <canvas id="draw"></canvas>
+        ${brushControlsHtml()}
+        <div class="row" style="margin-top:10px;">
+          <button id="submitBtn" ${gallery.topic?'':'disabled'}>제출하기</button>
+        </div>
+        <div class="msg" id="submitMsg"></div>
+      </div>
+    `}
+    <h2>다른 사람들의 그림</h2>
+    <div id="subFeed" class="grid"><span class="small">불러오는 중...</span></div>
+    <div class="footer-note">여기서 그린 그림과 정보는 이 갤러리를 보는 모든 사람에게 공개돼요.</div>
+  `;
+  const canvas = document.getElementById('draw');
+  setupCanvas(canvas);
+  bindBrushControls(document);
+
+  document.getElementById('submitBtn').onclick = async ()=>{
+    const msg = document.getElementById('submitMsg');
+    msg.textContent=''; 
+    const fresh = await loadGallery(id);
+    const subs = await loadSubs(id);
+    const image = canvas.toDataURL('image/jpeg', 0.7);
+    if(fresh.mode==='catchmind'){
+      const topic = document.getElementById('secretTopic').value.trim();
+      if(!topic){ msg.textContent='주제를 먼저 입력해주세요.'; msg.className='msg no'; return; }
+      subs.push({ id: genId(10), topic, image, correct:false, createdAt: Date.now() });
+      await saveSubs(id, subs);
+      document.getElementById('secretTopic').value='';
+    } else {
+      if(!fresh.topic){ msg.textContent='아직 주제가 정해지지 않았어요.'; msg.className='msg no'; return; }
+      subs.push({ id: genId(10), image, likes:0, likedBy:[], createdAt: Date.now() });
+      await saveSubs(id, subs);
+    }
+    clearCanvas(canvas);
+    msg.textContent = '제출 완료! 🎉'; msg.className='msg ok';
+    refreshFeed();
+  };
+
+  async function refreshFeed(){
+    const g2 = await loadGallery(id);
+    const subs = await loadSubs(id);
+    const feed = document.getElementById('subFeed');
+    if(!feed) return;
+    if(subs.length===0){ feed.innerHTML = '<span class="small">아직 그림이 없어요. 첫 그림을 그려보세요!</span>'; return; }
+    if(g2.mode==='catchmind'){
+      feed.innerHTML = subs.slice().reverse().map(s=>`
+        <div class="thumb-card">
+          <img src="${s.image}">
+          ${s.correct ? `<span class="badge correct">✅ 정답: ${escapeHtml(s.topic)}</span>` : `<span class="badge pending">🤔 맞히는 중</span>`}
+        </div>
+      `).join('');
+    } else {
+      const vId = await getVisitorId();
+      feed.innerHTML = subs.slice().reverse().map(s=>{
+        const liked = (s.likedBy||[]).includes(vId);
+        return `<div class="thumb-card" data-sid="${s.id}">
+          <img src="${s.image}">
+          <button class="like-btn" ${liked?'disabled':''}>${liked?'❤️ 좋아요 완료':'🤍 좋아요 ('+(s.likes||0)+')'}</button>
+        </div>`;
+      }).join('');
+      feed.querySelectorAll('.thumb-card').forEach(card=>{
+        const btn = card.querySelector('.like-btn');
+        btn.onclick = async ()=>{
+          const sid = card.dataset.sid;
+          const vId = await getVisitorId();
+          const freshSubs = await loadSubs(id);
+          const target = freshSubs.find(x=>x.id===sid);
+          if(!target) return;
+          target.likedBy = target.likedBy || [];
+          if(target.likedBy.includes(vId)) return;
+          target.likedBy.push(vId);
+          target.likes = (target.likes||0)+1;
+          await saveSubs(id, freshSubs);
+          refreshFeed();
+        };
+      });
+    }
+  }
+  refreshFeed();
+  pollTimer = setInterval(refreshFeed, 3000);
+}
+
+route();
+</script>
+</body>
+</html>
