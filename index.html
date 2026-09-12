@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>낙서 갤러리 - 캐치마인드</title>
+<title>낙서 갤러리</title>
 <style>
   :root{
     --bg:#fef6e4; --card:#ffffff; --ink:#26251f; --accent:#f582ae; --accent2:#8bd3dd;
@@ -76,10 +76,11 @@
 </div>
 
 <script>
+// 올바른 Supabase URL 및 Anon Key 적용
 const SUPABASE_URL = "https://usxaesuezcagnjrhngqt.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_vsJ3MIVQZ0jUgG_KfL0Njw_Eb6zfikC";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzeGFlc3VlemNhZ25qcmhuZ3F0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyMTQ3NTgsImV4cCI6MjEwNDc5MDc1OH0.RSY-kBFmTDx72VkjuwlaT9_5sF1szG6OV2QoluFUdR0";
 
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const APP = document.getElementById('app');
 let pollTimer = null;
