@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>낙서 갤러리</title>
+<title>낙서 갤러리 - 캐치마인드</title>
 <style>
   :root{
     --bg:#fef6e4; --card:#ffffff; --ink:#26251f; --accent:#f582ae; --accent2:#8bd3dd;
@@ -52,7 +52,7 @@
   a.home-link { color:#8a887d; font-size:12px; text-decoration:none; }
   .footer-note { font-size:11px; color:#a6a396; margin-top: 24px; line-height:1.6; }
 
-  /* 이미지 확대 모달 라이트박스 */
+  /* 이미지 확대 모달 */
   .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; justify-content:center; align-items:center; padding:20px; }
   .modal-overlay.active { display:flex; }
   .modal-content { max-width:90%; max-height:90%; background:#fff; border-radius:12px; padding:16px; text-align:center; position:relative; }
@@ -76,11 +76,11 @@
 </div>
 
 <script>
-// 올바른 Supabase URL 및 Anon Key 적용
+// Supabase 설정 (변수 중복 선언 제거 완료)
 const SUPABASE_URL = "https://usxaesuezcagnjrhngqt.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzeGFlc3VlemNhZ25qcmhuZ3F0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyMTQ3NTgsImV4cCI6MjEwNDc5MDc1OH0.RSY-kBFmTDx72VkjuwlaT9_5sF1szG6OV2QoluFUdR0";
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const APP = document.getElementById('app');
 let pollTimer = null;
@@ -118,17 +118,17 @@ async function getVisitorId(){
   return visitorId;
 }
 
-// ---------------- Supabase DB 함수 ----------------
+// ---------------- Supabase DB 연동 함수 ----------------
 async function loadGallery(id){
   try {
-    const { data, error } = await supabase.from('gallery').select('*').eq('id', id).single();
+    const { data, error } = await supabaseClient.from('gallery').select('*').eq('id', id).single();
     return error ? null : data;
   } catch(e){ return null; }
 }
 
 async function saveGallery(id, obj){
   try {
-    const { error } = await supabase.from('gallery').upsert({
+    const { error } = await supabaseClient.from('gallery').upsert({
       id: id,
       mode: obj.mode,
       topic: obj.topic || ''
@@ -139,7 +139,7 @@ async function saveGallery(id, obj){
 
 async function loadSubs(id){
   try {
-    const { data, error } = await supabase.from('submissions').select('*').eq('gallery_id', id).order('created_at', { ascending: true });
+    const { data, error } = await supabaseClient.from('submissions').select('*').eq('gallery_id', id).order('created_at', { ascending: true });
     if(error) return [];
     return data.map(item => ({
       ...item,
@@ -150,7 +150,7 @@ async function loadSubs(id){
 
 async function addSub(id, item){
   try {
-    const { error } = await supabase.from('submissions').insert({
+    const { error } = await supabaseClient.from('submissions').insert({
       id: item.id,
       gallery_id: id,
       author: item.author,
@@ -168,7 +168,7 @@ async function addSub(id, item){
 
 async function updateSub(item){
   try {
-    const { error } = await supabase.from('submissions').update({
+    const { error } = await supabaseClient.from('submissions').update({
       correct: item.correct,
       pinned: item.pinned,
       hidden: item.hidden,
@@ -181,7 +181,7 @@ async function updateSub(item){
 
 async function deleteSub(sid){
   try {
-    const { error } = await supabase.from('submissions').delete().eq('id', sid);
+    const { error } = await supabaseClient.from('submissions').delete().eq('id', sid);
     return !error;
   } catch(e){ return false; }
 }
@@ -196,7 +196,7 @@ function route(){
 }
 addEventListener('hashchange', route);
 
-// ---------------- 홈 ----------------
+// ---------------- 홈 화면 ----------------
 async function renderHome(){
   APP.innerHTML = `
     <h1>🎨 낙서 갤러리</h1>
@@ -210,7 +210,7 @@ async function renderHome(){
       <button id="createBtn">✏️ 내 갤러리 만들기</button>
     </div>
     <div id="myGalleryBox"></div>
-    <div class="footer-note">그림과 좋아요, 정답 여부는 이 사이트를 여는 모든 사람에게 공유되는 데이터로 저장돼요. 민감한 개인정보는 그리지 말아주세요.</div>
+    <div class="footer-note">그림과 좋아요, 정답 여부는 모든 사람에게 실시간 공유됩니다.</div>
   `;
   document.getElementById('createBtn').onclick = async ()=>{
     const id = genId(8);
@@ -222,12 +222,12 @@ async function renderHome(){
   const savedId = localStorage.getItem('my-gallery-id');
   if(savedId){
     const box = document.getElementById('myGalleryBox');
-    box.innerHTML = `<div class="card"><span class="small">이전에 만든 갤러리가 있어요.</span><br><button class="secondary" id="goMine">내 갤러리로 이동</button></div>`;
+    box.innerHTML = `<div class="card"><span class="small">이전에 만든 갤러리가 있어요.</span><br><button class="secondary" id="goMine" style="margin-top:6px;">내 갤러리로 이동</button></div>`;
     document.getElementById('goMine').onclick = ()=>{ location.hash = 'owner='+savedId; };
   }
 }
 
-// ---------------- 캔버스 위젯 ----------------
+// ---------------- 캔버스 그리기 ----------------
 function setupCanvas(canvas){
   const ctx = canvas.getContext('2d');
   canvas.width = 480; canvas.height = 360;
@@ -278,7 +278,7 @@ function bindBrushControls(scope){
   scope.querySelector('#clearBtn').onclick = ()=>{ clearCanvas(scope.querySelector('canvas')); };
 }
 
-// ---------------- 주인(오너) 화면 ----------------
+// ---------------- 주인 화면 ----------------
 async function renderOwner(id){
   const gallery = await loadGallery(id);
   if(!gallery){
@@ -290,10 +290,10 @@ async function renderOwner(id){
   APP.innerHTML = `
     <div class="topbar"><h1>🖼️ 내 갤러리 관리</h1><a class="home-link" href="#">홈</a></div>
     <div class="card">
-      <div class="small">🔒 주인 링크 (나만 보관, 공유 금지)</div>
-      <div class="link-box"><input type="text" readonly value="${ownerLink}" id="ownerLinkInput"></div>
+      <div class="small">🔒 주인 링크 (나만 보관)</div>
+      <div class="link-box"><input type="text" readonly value="${ownerLink}"></div>
       <div class="small" style="margin-top:10px;">📎 방문자 공유 링크</div>
-      <div class="link-box"><input type="text" readonly value="${visitLink}" id="visitLinkInput"><button class="secondary" id="copyBtn">복사</button></div>
+      <div class="link-box"><input type="text" readonly value="${visitLink}"><button class="secondary" id="copyBtn">복사</button></div>
     </div>
     <div class="card">
       <h2>모드 선택</h2>
@@ -303,7 +303,7 @@ async function renderOwner(id){
       </div>
       <div id="topicSetter" style="margin-top:10px; ${gallery.mode==='topic'?'':'display:none;'}">
         <div class="row">
-          <input type="text" id="topicInput" placeholder="오늘의 주제를 입력하세요 (예: 여름 바다)" value="${escapeHtml(gallery.topic||'')}">
+          <input type="text" id="topicInput" placeholder="오늘의 주제를 입력하세요" value="${escapeHtml(gallery.topic||'')}">
           <button id="setTopicBtn">주제 설정</button>
         </div>
         <div class="small" style="margin-top:6px;">현재 주제: <b>${gallery.topic ? escapeHtml(gallery.topic) : '(아직 없음)'}</b></div>
@@ -447,7 +447,6 @@ async function renderVisitor(id){
     `}
     <h2>다른 사람들의 그림</h2>
     <div id="subFeed" class="grid"><span class="small">불러오는 중...</span></div>
-    <div class="footer-note">여기서 그린 그림과 정보는 이 갤러리를 보는 모든 사람에게 공개돼요.</div>
   `;
   const canvas = document.getElementById('draw');
   setupCanvas(canvas);
@@ -531,6 +530,7 @@ async function renderVisitor(id){
   pollTimer = setInterval(refreshFeed, 3000);
 }
 
+// 앱 시작
 route();
 </script>
 </body>
