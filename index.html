@@ -106,7 +106,7 @@ let visitorId = null;
 
 let undoStack = [];
 let redoStack = [];
-const MAX_UNDO = 100; // ✅ Undo/Redo 횟수 제한 확장 (10회 -> 100회)
+const MAX_UNDO = 100;
 let currentActiveCanvas = null;
 let currentActiveGalleryId = null;
 
@@ -447,9 +447,8 @@ function saveState(canvas, galleryId){
   }
 }
 
-// ✅ [버그 수정] 최초 흰 바탕 상태를 보존하고 전체 삭제를 방지하는 Undo 로직
 function undo(canvas, galleryId){
-  if(undoStack.length <= 1) return; // 초기 베이스 스냅샷 유지
+  if(undoStack.length <= 1) return;
   const ctx = canvas.getContext('2d');
   redoStack.push(undoStack.pop());
   const prevState = undoStack[undoStack.length - 1];
@@ -505,7 +504,6 @@ function floodFill(canvas, startX, startY, fillColorRgba){
   ctx.putImageData(imgData, 0, 0);
 }
 
-// ✅ [버그 수정] 초기 접속 시 배경을 흰색으로 명확하게 칠한 후 스냅샷을 찍어 즉시 Undo 오류 방지
 function setupCanvas(canvas, galleryId){
   currentActiveCanvas = canvas;
   currentActiveGalleryId = galleryId;
@@ -514,7 +512,6 @@ function setupCanvas(canvas, galleryId){
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   undoStack = []; redoStack = [];
 
-  // 1. 기본 배경 렌더링
   ctx.fillStyle = '#ffffff'; 
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -527,7 +524,7 @@ function setupCanvas(canvas, galleryId){
     };
     img.src = savedDraft;
   } else { 
-    saveState(canvas, galleryId); // 초기 흰 바탕 상태를 스냅샷 1번으로 보관
+    saveState(canvas, galleryId);
   }
 
   let last = null;
@@ -802,8 +799,16 @@ async function renderVisitor(id, keyFromUrl=null){
     submitBtn.disabled = true;
     msg.textContent = '업로드 중...'; msg.className = 'msg';
 
-    // ✅ [색감 변형 해결] JPEG 대신 Alpha 채널과 투명도를 손실 없이 인코딩하는 PNG로 변경
-    const image = canvas.toDataURL('image/png');
+    // ✅ [색감 탁해짐 완벽 해결] 임시 캔버스에 순백색 배경을 채운 뒤 그림을 병합하여 PNG로 변환
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = canvas.width;
+    tempCanvas.height = canvas.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCtx.fillStyle = '#ffffff';
+    tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+    tempCtx.drawImage(canvas, 0, 0);
+
+    const image = tempCanvas.toDataURL('image/png');
     const author = document.getElementById('authorName').value.trim() || '익명';
     localStorage.setItem('visitor-nickname', author);
 
