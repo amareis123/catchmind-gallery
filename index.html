@@ -34,6 +34,7 @@
   .badge.pinned { background:#ffe3ec; color:var(--accent); }
   .badge.hidden { background:#e2e2e2; color:#666; }
   .badge.public { background:#d9f3df; color:var(--good); }
+  .badge.banned { background:#ffd1d1; color:var(--bad); }
   
   .grid { display:flex; flex-wrap:wrap; gap:12px; }
   .gallery-card { width: 220px; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; cursor:pointer; transition:transform 0.1s; }
@@ -42,6 +43,7 @@
 
   .thumb-card { width: 220px; background:#fbfaf5; border:1px solid var(--line); border-radius:10px; padding:10px; font-size:12px; position:relative; }
   .thumb-card.pinned-card { border: 2px solid var(--accent); background:#fff0f5; }
+  .thumb-card.hidden-card { opacity: 0.65; border: 1px dashed #888; }
   .thumb-card img { width:100%; border-radius:6px; display:block; margin-bottom:6px; background:#fff; cursor:pointer; }
   
   .like-btn { background:#fff; color:#666; border:1px solid var(--line); font-size:12px; padding:6px 10px; margin-top:4px; border-radius:6px; width:100%; font-weight:600; }
@@ -73,6 +75,9 @@
   .modal-content { max-width:90%; max-height:90%; background:#fff; border-radius:12px; padding:16px; text-align:center; position:relative; }
   .modal-content img { max-width:100%; max-height:70vh; border-radius:8px; display:block; margin:0 auto; }
   .modal-close { position:absolute; top:8px; right:12px; background:none; border:none; font-size:24px; cursor:pointer; color:#333; }
+
+  /* 필터 스위치 UI */
+  .filter-toggle { display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:bold; cursor:pointer; background:#fff; padding:4px 10px; border-radius:20px; border:1px solid var(--line); }
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -433,6 +438,7 @@ function getRgbaColor(hex, opacity){
   return `rgba(${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}, ${opacity})`;
 }
 
+// ✅ [버그 수정] 새로고침 없이 바로 그려도 전체 삭제되지 않도록 Undo 히스토리 보존
 function saveState(canvas, galleryId){
   const ctx = canvas.getContext('2d');
   if(undoStack.length >= MAX_UNDO) undoStack.shift();
@@ -444,7 +450,7 @@ function saveState(canvas, galleryId){
 }
 
 function undo(canvas, galleryId){
-  if(undoStack.length <= 1) return;
+  if(undoStack.length <= 1) return; // 베이스 상태를 보호
   const ctx = canvas.getContext('2d');
   redoStack.push(undoStack.pop());
   const prevState = undoStack[undoStack.length - 1];
@@ -500,6 +506,7 @@ function floodFill(canvas, startX, startY, fillColorRgba){
   ctx.putImageData(imgData, 0, 0);
 }
 
+// ✅ 캔버스 마운트 시 최초 빈 상태를 스냅샷으로 강제 push하여 새로고침 없는 첫 작성 완벽 지원
 function setupCanvas(canvas, galleryId){
   currentActiveCanvas = canvas;
   currentActiveGalleryId = galleryId;
@@ -519,7 +526,7 @@ function setupCanvas(canvas, galleryId){
   } else { 
     ctx.fillStyle = '#ffffff'; 
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    saveState(canvas, galleryId); 
+    saveState(canvas, galleryId); // 필수 스냅샷
   }
 
   let last = null;
@@ -661,19 +668,23 @@ async function renderVisitor(id, keyFromUrl=null){
 
   const storedOwnerKey = localStorage.getItem(`owner_key_${id}`);
   const currentKey = keyFromUrl || storedOwnerKey;
-  // 오너 확인: URL 키나 로컬에 저장된 키가 일치하거나, 혹은 만약 키가 없더라도 DB owner_key와 로컬스토리지 소유 정보가 맞으면 오너 권한 부여
   const isOwner = (currentKey && currentKey === gallery.owner_key) || (storedOwnerKey && storedOwnerKey === gallery.owner_key);
   const isMaster = isMasterAdmin();
   const canManage = isOwner || isMaster;
 
   const myVid = await getVisitorId();
+  const isBanned = (gallery.banned_visitors || []).includes(myVid);
   const savedName = localStorage.getItem('visitor-nickname') || '';
   let currentSort = 'popular';
+  
+  // ✅ 비공개 그림 보기 ON/OFF 필터 상태 (기본값: OFF)
+  let showPrivateFilter = false;
 
   APP.innerHTML = `
     <div class="topbar">
       <h1>🎨 ${escapeHtml(gallery.title)} 
         ${isMaster ? '<span class="badge pinned">👑 마스터 모드</span>' : (isOwner ? '<span class="badge public">🔑 갤러리 소유자</span>' : '')}
+        ${isBanned ? '<span class="badge banned">🚫 차단된 사용자</span>' : ''}
       </h1>
       <a class="home-link" href="#">홈으로</a>
     </div>
@@ -697,19 +708,27 @@ async function renderVisitor(id, keyFromUrl=null){
 
     <div class="card">
       <h2>✏️ 캔버스에 그림 그리기</h2>
+      ${isBanned ? `<p style="color:var(--bad); font-weight:bold; font-size:13px;">🚫 이 갤러리에서 차단되어 그림을 업로드할 수 없습니다.</p>` : ''}
       <div class="row" style="margin-bottom:8px;">
-        <input type="text" id="authorName" placeholder="내 닉네임 (선택)" value="${escapeHtml(savedName)}" style="flex:1; max-width:240px;">
+        <input type="text" id="authorName" placeholder="내 닉네임 (선택)" value="${escapeHtml(savedName)}" style="flex:1; max-width:240px;" ${isBanned?'disabled':''}>
       </div>
       <canvas id="draw"></canvas>
       ${brushControlsHtml()}
       <div class="row" style="margin-top:10px;">
-        <button id="submitBtn">작품 등록하기</button>
+        <button id="submitBtn" ${isBanned?'disabled':''}>작품 등록하기</button>
       </div>
       <div class="msg" id="submitMsg"></div>
     </div>
 
     <div class="row" style="justify-content:space-between; margin:16px 0 8px;">
-      <h2>작품 목록</h2>
+      <div class="row" style="gap:12px;">
+        <h2 style="margin:0;">작품 목록</h2>
+        ${canManage ? `
+          <label class="filter-toggle">
+            <input type="checkbox" id="privateFilterToggle"> 👁️ 비공개 그림 포함 (ON)
+          </label>
+        ` : ''}
+      </div>
       <select id="sortSelect">
         <option value="popular">🔥 인기순</option>
         <option value="newest">✨ 최신순</option>
@@ -720,7 +739,15 @@ async function renderVisitor(id, keyFromUrl=null){
     <div id="subFeed" class="grid"><span class="small">불러오는 중...</span></div>
   `;
 
-  // 닉네임 입력란 값 변경 시 로컬스토리지에 실시간 반영하여 댓글에서도 사용
+  // 비공개 필터 토글 이벤트 바인딩
+  const filterToggle = document.getElementById('privateFilterToggle');
+  if(filterToggle){
+    filterToggle.onchange = (e) => {
+      showPrivateFilter = e.target.checked;
+      refreshFeed();
+    };
+  }
+
   const authorInput = document.getElementById('authorName');
   if(authorInput){
     authorInput.oninput = (e)=>{
@@ -754,20 +781,51 @@ async function renderVisitor(id, keyFromUrl=null){
   setupCanvas(canvas, id);
   bindBrushControls(document, id);
 
+  // ✅ [도배 방지 & 밴 검사] 작품 제출 처리
   document.getElementById('submitBtn').onclick = async ()=>{
+    const submitBtn = document.getElementById('submitBtn');
     const msg = document.getElementById('submitMsg');
+    
+    // 밴 사용자 재차단
+    if(isBanned){
+      msg.textContent = '차단된 사용자는 업로드할 수 없습니다.'; msg.className = 'msg no';
+      return;
+    }
+
+    // 쿨타임(10초) 검사
+    const lastUpload = parseInt(localStorage.getItem(`last-upload-${id}`) || '0');
+    const now = Date.now();
+    const cooldown = 10000; // 10초
+
+    if (now - lastUpload < cooldown) {
+      const remainSec = Math.ceil((cooldown - (now - lastUpload)) / 1000);
+      msg.textContent = `⚡ 도배 방지: 너무 빠른 연속 요청입니다. ${remainSec}초 후 다시 시도해주세요.`;
+      msg.className = 'msg no';
+      return;
+    }
+
+    submitBtn.disabled = true;
+    msg.textContent = '업로드 중...'; msg.className = 'msg';
+
     const image = canvas.toDataURL('image/jpeg', 0.7);
     const author = document.getElementById('authorName').value.trim() || '익명';
     localStorage.setItem('visitor-nickname', author);
 
-    await addSub(id, { id: genId(10), author, image });
-    localStorage.removeItem(`draft-canvas-${id}`);
-    
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height);
-    saveState(canvas, id);
-    msg.textContent = '그림 제출 완료! 🎉'; msg.className='msg ok';
-    refreshFeed();
+    const ok = await addSub(id, { id: genId(10), author, image });
+    submitBtn.disabled = false;
+
+    if(ok){
+      localStorage.setItem(`last-upload-${id}`, Date.now()); // 마지막 업로드 시간 갱신
+      localStorage.removeItem(`draft-canvas-${id}`);
+      
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+      saveState(canvas, id);
+      msg.textContent = '그림 제출 완료! 🎉'; msg.className='msg ok';
+      refreshFeed();
+    } else {
+      msg.textContent = '업로드에 실패했습니다. 다시 시도해주세요.'; msg.className='msg no';
+    }
   };
 
   document.getElementById('sortSelect').onchange = (e)=>{
@@ -775,17 +833,20 @@ async function renderVisitor(id, keyFromUrl=null){
     refreshFeed();
   };
 
+  // ✅ 비공개 그림 필터 및 밴 관리 액션 포함 목록 리프레시
   async function refreshFeed(){
     if(document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
 
     let subs = await loadSubs(id);
-    if(!canManage) {
+
+    // ✅ 관리자/오너 필터 제어 (토글 필터가 꺼져있거나 권한이 없으면 비공개(hidden) 그림 숨김)
+    if(!canManage || !showPrivateFilter) {
       subs = subs.filter(s=>!s.hidden); 
     }
 
     const feed = document.getElementById('subFeed');
     if(!feed) return;
-    if(subs.length === 0){ feed.innerHTML = '<span class="small">등록된 그림이 없습니다.</span>'; return; }
+    if(subs.length === 0){ feed.innerHTML = '<span class="small">표시할 그림이 없습니다.</span>'; return; }
 
     subs.sort((a,b)=>{
       if(b.pinned !== a.pinned) return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
@@ -799,11 +860,12 @@ async function renderVisitor(id, keyFromUrl=null){
       const isMine = s.visitor_id === myVid;
       const isLiked = (s.likedBy || []).includes(myVid);
       const isCover = (gallery.cover_image === s.image);
+      const isAuthorBanned = (gallery.banned_visitors || []).includes(s.visitor_id);
       const comments = await loadComments(s.id);
 
       html += `
-        <div class="thumb-card ${s.pinned ? 'pinned-card' : ''}" data-sid="${s.id}">
-          <span class="author">👤 ${escapeHtml(s.author || '익명')} ${isMine?'(나)':''}</span>
+        <div class="thumb-card ${s.pinned ? 'pinned-card' : ''} ${s.hidden ? 'hidden-card' : ''}" data-sid="${s.id}">
+          <span class="author">👤 ${escapeHtml(s.author || '익명')} ${isMine?'(나)':''} ${isAuthorBanned ? '<span class="badge banned">차단됨</span>':''}</span>
           ${isCover ? '<span class="badge public">🖼️ 대표 썸네일</span>' : ''}
           ${s.pinned ? '<span class="badge pinned">📌 고정됨</span>' : ''}
           ${s.hidden ? '<span class="badge hidden">🔒 비공개</span>' : ''}
@@ -818,6 +880,7 @@ async function renderVisitor(id, keyFromUrl=null){
               ${canManage ? `<button class="secondary setCoverBtn">${isCover ? '🖼️ 썸네일 해제' : '🖼️ 썸네일 지정'}</button>` : ''}
               ${canManage ? `<button class="ghost pinBtn">${s.pinned ? '📌 고정해제' : '📌 고정'}</button>` : ''}
               ${canManage ? `<button class="ghost hideBtn">${s.hidden ? '👁️ 공개' : '🔒 비공개'}</button>` : ''}
+              ${(canManage && !isMine) ? `<button class="danger banUserBtn">${isAuthorBanned ? '🔓 차단해제' : '🚫 유저 밴'}</button>` : ''}
               <button class="danger deleteBtn">🗑️ 삭제</button>
             </div>
           ` : ''}
@@ -843,8 +906,8 @@ async function renderVisitor(id, keyFromUrl=null){
               }
             </div>
             <div class="row" style="gap:4px;">
-              <input type="text" placeholder="댓글을 입력하세요..." class="commentInput" style="font-size:11px; padding:6px 8px; flex:1;">
-              <button class="commentBtn" style="padding:6px 10px; font-size:11px;">등록</button>
+              <input type="text" placeholder="댓글을 입력하세요..." class="commentInput" style="font-size:11px; padding:6px 8px; flex:1;" ${isBanned?'disabled':''}>
+              <button class="commentBtn" style="padding:6px 10px; font-size:11px;" ${isBanned?'disabled':''}>등록</button>
             </div>
           </div>
         </div>
@@ -868,6 +931,25 @@ async function renderVisitor(id, keyFromUrl=null){
         await updateSub(target);
         refreshFeed();
       };
+
+      // ✅ 관리자/갤러리 주인 밴 토글 기능 처리
+      const banBtn = card.querySelector('.banUserBtn');
+      if(banBtn){
+        banBtn.onclick = async ()=>{
+          const targetVid = target.visitor_id;
+          let bannedList = gallery.banned_visitors || [];
+          if(bannedList.includes(targetVid)){
+            bannedList = bannedList.filter(v => v !== targetVid);
+            alert(`${target.author || '익명'} 님의 차단이 해제되었습니다.`);
+          } else {
+            if(!confirm(`${target.author || '익명'} 님을 차단하시겠습니까? 더 이상 이 갤러리에 업로드할 수 없게 됩니다.`)) return;
+            bannedList.push(targetVid);
+          }
+          gallery.banned_visitors = bannedList;
+          await saveGallery(id, gallery);
+          renderVisitor(id, currentKey);
+        };
+      }
 
       const setCoverBtn = card.querySelector('.setCoverBtn');
       if(setCoverBtn){
