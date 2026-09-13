@@ -106,10 +106,16 @@
 
 <script>
 const SUPABASE_URL = "https://usxaesuezcagnjrhngqt.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInRefiI6InVzeGFlc3VlemNhZ25qcmhuZ3F0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyMTQ3NTgsImV4cCI6MjEwNDc5MDc1OH0.RSY-kBFmTDx72VkjuwlaT9_5sF1szG6OV2QoluFUdR0";
+// ✅ 전달해주신 올바른 anon public 키 적용 및 401 방지 클라이언트 설정
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzeGFlc3VlemNhZ25qcmhuZ3F0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyMTQ3NTgsImV4cCI6MjEwNDc5MDc1OH0.RSY-kBFmTDx72VkjuwlaT9_5sF1szG6OV2QoluFUdR0";
 const MASTER_ADMIN_PW = "admin1234";
 
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: false
+  }
+});
+
 const APP = document.getElementById('app');
 let pollTimer = null;
 let currentBrush = { color:'#26251f', opacity: 1.0, size:4, tool:'brush' };
@@ -535,7 +541,6 @@ function moveLayer(index, dir){
   renderLayerUI();
 }
 
-/* ✅ [요청 반영 1] 레이어 이름 변경 기능 */
 function renameLayer(index){
   const currentName = layers[index].name;
   const newName = prompt('변경할 레이어 이름을 입력하세요:', currentName);
@@ -931,8 +936,6 @@ async function renderVisitor(id, keyFromUrl=null){
 
     if(ok){
       localStorage.setItem(`last-upload-${id}`, Date.now());
-      
-      // ✅ 등록 완료 후 Undo Stack 및 레이어 히스토리 완전히 리셋 (이전 그림으로 돌아가는 버그 방지)
       clearUndoHistory();
       setupMultiLayerStudio(id);
 
@@ -985,7 +988,6 @@ async function renderVisitor(id, keyFromUrl=null){
             ${isLiked ? '💖 좋아요 완료' : '🤍 좋아요'} (${s.likes||0})
           </button>
           
-          <!-- ✅ [요청 반영 2] 그림 가져와서 수정 기능 버튼 복구 -->
           <button class="secondary remixBtn" style="width:100%; margin-top:4px; font-size:11px;">🖌️ 그림 가져와서 수정</button>
 
           ${(canManage || isMine) ? `
@@ -1032,7 +1034,6 @@ async function renderVisitor(id, keyFromUrl=null){
       const sid = card.dataset.sid;
       const target = subs.find(x=>x.id===sid);
 
-      /* ✅ 그림 가져와서 수정 이벤트 핸들러 */
       const remixBtn = card.querySelector('.remixBtn');
       if(remixBtn){
         remixBtn.onclick = ()=>{
