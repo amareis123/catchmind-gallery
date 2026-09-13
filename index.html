@@ -106,14 +106,11 @@
 
 <script>
 const SUPABASE_URL = "https://usxaesuezcagnjrhngqt.supabase.co";
-// ✅ 전달해주신 올바른 anon public 키 적용 및 401 방지 클라이언트 설정
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzeGFlc3VlemNhZ25qcmhuZ3F0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyMTQ3NTgsImV4cCI6MjEwNDc5MDc1OH0.RSY-kBFmTDx72VkjuwlaT9_5sF1szG6OV2QoluFUdR0";
 const MASTER_ADMIN_PW = "admin1234";
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    persistSession: false
-  }
+  auth: { persistSession: false }
 });
 
 const APP = document.getElementById('app');
@@ -165,7 +162,7 @@ async function loadGallery(id){
 
 async function saveGallery(id, obj){
   try {
-    const { data, error } = await supabaseClient.from('gallery').upsert({
+    const { error } = await supabaseClient.from('gallery').upsert({
       id: id,
       owner_key: obj.owner_key || genId(16),
       title: obj.title || '나만의 갤러리',
@@ -274,15 +271,12 @@ function route(){
 }
 addEventListener('hashchange', route);
 
-// 단축키 (Ctrl+Z, Ctrl+Y)
 window.addEventListener('keydown', (e) => {
   const activeEl = document.activeElement;
   if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) return;
-
   if (e.ctrlKey || e.metaKey) {
     if (e.key.toLowerCase() === 'z') {
-      if (e.shiftKey) { redo(); } 
-      else { undo(); }
+      if (e.shiftKey) { redo(); } else { undo(); }
       e.preventDefault();
     } else if (e.key.toLowerCase() === 'y') {
       redo();
@@ -294,10 +288,8 @@ window.addEventListener('keydown', (e) => {
 function determineGalleryCover(gallery, visibleSubs){
   if(visibleSubs.length === 0) return null;
   if(gallery.cover_image && visibleSubs.some(s=>s.image === gallery.cover_image)) return gallery.cover_image;
-
   const pinnedSubs = visibleSubs.filter(s => s.pinned);
   if(pinnedSubs.length > 0) return pinnedSubs[Math.floor(Math.random() * pinnedSubs.length)].image;
-
   const maxLikes = Math.max(...visibleSubs.map(s => s.likes || 0));
   if(maxLikes > 0){
     const topLikedSubs = visibleSubs.filter(s => (s.likes || 0) === maxLikes);
@@ -630,6 +622,7 @@ function setupMultiLayerStudio(galleryId, initialBgImage = null){
   layerIdCounter = 0;
   clearUndoHistory();
 
+  // 최초 레이어 생성 (가져온 그림이 있으면 배경으로 주입)
   addLayer('배경 레이어', initialBgImage);
   
   let last = null;
