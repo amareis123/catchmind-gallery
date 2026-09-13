@@ -30,7 +30,7 @@
   .badge.public { background:#d9f3df; color:var(--good); }
   .badge.banned { background:#ffd1d1; color:var(--bad); }
 
-  /* PC 넓은 작업실 레이아웃 (캔버스를 시원하게 중앙 배치) */
+  /* PC 넓은 작업실 레이아웃 */
   .editor-wrapper { display: flex; flex-direction: column; gap: 12px; }
   .canvas-area-main { display: flex; flex-direction: column; align-items: center; width: 100%; }
   .canvas-container { position: relative; width: 100%; max-width: 860px; height: 540px; background: #fff; border: 2px solid var(--line); border-radius: 10px; overflow: hidden; margin: 0 auto; }
@@ -47,11 +47,11 @@
     .canvas-container { max-width: 100%; height: 560px; }
   }
 
-  /* 모바일 최적화 스튜디오 스타일 */
+  /* 모바일 최적화 스튜디오 스타일 (파렛트 보강) */
   .mobile-studio { display: flex; flex-direction: column; gap: 10px; background: #faf8f3; border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
   .mobile-canvas-container { position: relative; width: 100%; height: 320px; background: #fff; border: 2px solid var(--line); border-radius: 8px; overflow: hidden; margin: 0 auto; }
   .mobile-canvas-container canvas { position: absolute; top:0; left:0; width:100%; height:100%; touch-action: none; cursor: crosshair; }
-  .mobile-tools-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
+  .mobile-tools-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin: 6px 0; }
   .mobile-swatch { height: 26px; border-radius: 4px; border: 1px solid #fff; box-shadow: 0 0 0 1px var(--line); cursor: pointer; }
   .mobile-swatch.active { box-shadow: 0 0 0 2px var(--ink); transform: scale(1.05); }
 
@@ -198,6 +198,7 @@ async function saveGallery(id, obj){
       topic: obj.topic || '',
       banned_visitors: obj.banned_visitors || []
     }, { onConflict: 'id' }).select();
+    if(error) console.error("Gallery save error:", error);
     return !error;
   } catch(e){ return false; }
 }
@@ -233,6 +234,7 @@ async function addSub(id, item){
       liked_by: [],
       visitor_id: vId
     });
+    if(error) console.error("Add sub error:", error);
     return !error;
   } catch(e){ return false; }
 }
@@ -264,11 +266,23 @@ async function loadComments(subId){
 async function addComment(subId, author, content, imageBase64 = null){
   try {
     const vId = await getVisitorId();
-    const { error } = await supabaseClient.from('comments').insert({
-      id: genId(10), submission_id: subId, author: author || '익명', content: content, image: imageBase64, visitor_id: vId, is_edited: false
-    });
+    const payload = {
+      id: genId(10),
+      submission_id: subId,
+      author: author || '익명',
+      content: content || '',
+      visitor_id: vId,
+      is_edited: false
+    };
+    if(imageBase64) payload.image = imageBase64;
+
+    const { error } = await supabaseClient.from('comments').insert(payload);
+    if(error) console.error("Add comment error:", error);
     return !error;
-  } catch(e){ return false; }
+  } catch(e){ 
+    console.error(e);
+    return false; 
+  }
 }
 
 async function updateComment(cid, newContent){
@@ -416,7 +430,7 @@ async function renderHome(){
     galleryDataList.sort((a,b)=>{
       if(gallerySort === 'popular') return b.totalLikes - a.totalLikes;
       if(gallerySort === 'newest') return new Date(b.gallery.created_at) - new Date(a.gallery.created_at);
-      if(gallerySort === 'oldest') return new Date(b.gallery.created_at) - new Date(a.gallery.created_at);
+      if(gallerySort === 'oldest') return new Date(a.gallery.created_at) - new Date(b.gallery.created_at);
     });
 
     let html = '';
@@ -752,21 +766,34 @@ function brushControlsHtml(){
     </div>`;
 }
 
+// 모바일 전용 디테일 파렛트 컨트롤 (수정됨)
 function mobileBrushControlsHtml(){
-  const colors = ['#26251f','#d9534f','#f582ae','#3aa655','#3a8fd9','#ffffff'];
+  const colors = ['#26251f','#d9534f','#f582ae','#f0ad4e','#3aa655','#3a8fd9','#8b5aa8','#ffffff'];
   return `
     <div class="row" style="gap:4px; margin-bottom:6px;">
-      <button type="button" class="tool-btn active" id="mobileToolBrush" style="padding:4px; font-size:11px;">🖌️ 붓</button>
-      <button type="button" class="tool-btn" id="mobileToolEraser" style="padding:4px; font-size:11px;">橡 지우개</button>
-      <button type="button" class="tool-btn" id="mobileToolFill" style="padding:4px; font-size:11px;">🪣 채우기</button>
+      <button type="button" class="tool-btn active" id="mobileToolBrush" style="padding:6px; font-size:11px;">🖌️ 붓</button>
+      <button type="button" class="tool-btn" id="mobileToolEraser" style="padding:6px; font-size:11px;">橡 지우개</button>
+      <button type="button" class="tool-btn" id="mobileToolFill" style="padding:6px; font-size:11px;">🪣 채우기</button>
     </div>
+
+    <div style="font-size:11px; font-weight:bold; margin-top:4px;">팔레트 & 색상 선택기</div>
     <div class="mobile-tools-grid">
       ${colors.map(c=>`<span class="mobile-swatch ${c==='#26251f'?'active':''}" data-color="${c}" style="background:${c};"></span>`).join('')}
     </div>
-    <div class="row" style="margin-top:6px; gap:8px;">
-      <div style="flex:1;"><span class="small">굵기: <b id="mobileBrushSizeVal">4px</b></span><input type="range" min="1" max="30" value="4" id="mobileBrushSize" style="width:100%;"></div>
-      <button class="ghost" id="mobileUndoBtn" type="button" style="padding:6px 10px; font-size:11px;">↩️ 되돌리기</button>
-      <button class="ghost" id="mobileClearBtn" type="button" style="color:var(--bad); padding:6px 10px; font-size:11px;">🗑️ 리셋</button>
+    
+    <div class="row" style="margin-bottom:6px; gap:8px;">
+      <span class="small" style="font-size:11px;">커스텀 색상:</span>
+      <input type="color" id="mobileCustomColorPicker" value="#26251f" style="flex:1; height:28px; border-radius:4px; cursor:pointer; border:1px solid var(--line);">
+    </div>
+
+    <div class="row" style="margin-top:4px; gap:8px;">
+      <div style="flex:1;"><span class="small">굵기: <b id="mobileBrushSizeVal">4px</b></span><input type="range" min="1" max="50" value="4" id="mobileBrushSize" style="width:100%;"></div>
+      <div style="flex:1;"><span class="small">투명도: <b id="mobileBrushOpacityVal">100%</b></span><input type="range" min="5" max="100" value="100" id="mobileBrushOpacity" style="width:100%;"></div>
+    </div>
+
+    <div class="row" style="margin-top:6px; gap:4px;">
+      <button class="ghost" id="mobileUndoBtn" type="button" style="flex:1; padding:6px 4px; font-size:11px;">↩️ 되돌리기</button>
+      <button class="ghost" id="mobileClearBtn" type="button" style="flex:1; color:var(--bad); padding:6px 4px; font-size:11px;">🗑️ 리셋</button>
     </div>`;
 }
 
@@ -776,8 +803,10 @@ function bindBrushControls(scope){
       currentBrush.color = s.dataset.color; 
       scope.querySelectorAll('.swatch, .mobile-swatch').forEach(x=>x.classList.remove('active')); 
       s.classList.add('active'); 
-      const picker = scope.querySelector('#customColorPicker');
-      if(picker) picker.value = currentBrush.color.length === 7 ? currentBrush.color : '#26251f';
+      const pcPicker = scope.querySelector('#customColorPicker');
+      const mobilePicker = scope.querySelector('#mobileCustomColorPicker');
+      if(pcPicker) pcPicker.value = currentBrush.color.length === 7 ? currentBrush.color : '#26251f';
+      if(mobilePicker) mobilePicker.value = currentBrush.color.length === 7 ? currentBrush.color : '#26251f';
     };
   });
 
@@ -786,6 +815,14 @@ function bindBrushControls(scope){
     colorPicker.oninput = (e)=>{
       currentBrush.color = e.target.value;
       scope.querySelectorAll('.swatch').forEach(x=>x.classList.remove('active'));
+    };
+  }
+
+  const mobileColorPicker = scope.querySelector('#mobileCustomColorPicker');
+  if(mobileColorPicker){
+    mobileColorPicker.oninput = (e)=>{
+      currentBrush.color = e.target.value;
+      scope.querySelectorAll('.mobile-swatch').forEach(x=>x.classList.remove('active'));
     };
   }
 
@@ -808,8 +845,8 @@ function bindBrushControls(scope){
     };
   }
 
-  const opInput = scope.querySelector('#brushOpacity');
-  const opVal = scope.querySelector('#brushOpacityVal');
+  const opInput = scope.querySelector('#brushOpacity, #mobileBrushOpacity');
+  const opVal = scope.querySelector('#brushOpacityVal, #mobileBrushOpacityVal');
   if(opInput && opVal){
     opInput.oninput = (e)=>{
       const val = parseInt(e.target.value);
@@ -894,7 +931,7 @@ async function renderVisitor(id, keyFromUrl=null){
       </div>
 
       ${isMobile ? `
-        <!-- 모바일 전용 컴팩트 UI -->
+        <!-- 모바일 전용 UI (디테일 파렛트 포함) -->
         <div class="mobile-studio">
           <div class="mobile-canvas-container" id="mobileCanvasContainer"></div>
           ${mobileBrushControlsHtml()}
@@ -902,7 +939,7 @@ async function renderVisitor(id, keyFromUrl=null){
           <div class="msg" id="submitMsg"></div>
         </div>
       ` : `
-        <!-- PC 전용 와이드 3컬럼 스튜디오 UI (중앙 캔버스를 더 넓게 확보) -->
+        <!-- PC 전용 와이드 3컬럼 스튜디오 UI -->
         <div class="editor-wrapper">
           <div class="palette-box">
             ${brushControlsHtml()}
@@ -1037,7 +1074,7 @@ async function renderVisitor(id, keyFromUrl=null){
         setupMultiLayerStudio(id);
         refreshFeed();
       } else {
-        msg.textContent = '댓글 등록에 실패했습니다.'; msg.className='msg no';
+        msg.textContent = '댓글 등록에 실패했습니다. (Supabase RLS 권한을 확인해 주세요)'; msg.className='msg no';
       }
     } else {
       const lastUpload = parseInt(localStorage.getItem(`last-upload-${id}`) || '0');
@@ -1060,7 +1097,7 @@ async function renderVisitor(id, keyFromUrl=null){
         msg.textContent = '새 작품 제출 완료! 🎉'; msg.className='msg ok';
         refreshFeed();
       } else {
-        msg.textContent = '업로드에 실패했습니다. 다시 시도해주세요.'; msg.className='msg no';
+        msg.textContent = '업로드에 실패했습니다. (Supabase RLS 권한을 확인해 주세요)'; msg.className='msg no';
       }
     }
   };
