@@ -11,31 +11,49 @@
   }
   * { box-sizing: border-box; }
   body { margin:0; font-family: 'Malgun Gothic', -apple-system, sans-serif; background: var(--bg); color: var(--ink); min-height:100vh; }
-  #app { max-width: 760px; margin: 0 auto; padding: 20px 16px 60px; }
+  #app { max-width: 1280px; margin: 0 auto; padding: 20px 16px 60px; }
   h1 { font-size: 22px; margin: 6px 0 4px; }
   h2 { font-size: 17px; margin: 18px 0 8px; }
   p.sub { color:#6b6a63; font-size: 13px; margin-top:0; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); }
-  button { font-family: inherit; cursor: pointer; border: none; border-radius: 10px; padding: 10px 16px; font-size: 14px; background: var(--accent); color: #fff; font-weight: 600; }
+  button { font-family: inherit; cursor: pointer; border: none; border-radius: 8px; padding: 8px 12px; font-size: 13px; background: var(--accent); color: #fff; font-weight: 600; }
   button.secondary { background: var(--accent2); color:#1a3c40; }
   button.ghost { background: #eee; color: #444; }
   button.danger { background: var(--bad); color: #fff; }
   button:disabled { opacity: 0.5; cursor: not-allowed; }
-  input[type=text], input[type=password], select { font-family: inherit; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line); font-size: 14px; }
+  input[type=text], input[type=password], select { font-family: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); font-size: 13px; }
   .row { display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
-  canvas { border-radius: 10px; border: 2px solid var(--line); background:#fff; touch-action: none; width:100%; max-width:480px; height:auto; display:block; cursor: crosshair; }
   
-  .swatch { width:24px; height:24px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1px var(--line); cursor:pointer; display:inline-block; vertical-align:middle; }
-  .swatch.active { box-shadow: 0 0 0 2px var(--ink); transform: scale(1.1); }
-  .color-picker-wrapper { display:inline-flex; align-items:center; gap:4px; font-size:12px; background:#f4f4f4; padding:2px 8px; border-radius:20px; border:1px solid var(--line); }
-  .color-picker-wrapper input[type="color"] { border:none; width:22px; height:22px; border-radius:50%; cursor:pointer; background:none; padding:0; }
-
   .badge { display:inline-block; font-size:11px; padding:2px 8px; border-radius:20px; font-weight:700; }
   .badge.pinned { background:#ffe3ec; color:var(--accent); }
   .badge.hidden { background:#e2e2e2; color:#666; }
   .badge.public { background:#d9f3df; color:var(--good); }
   .badge.banned { background:#ffd1d1; color:var(--bad); }
+
+  /* --- PC용 3컬럼 Studio 레이아웃 --- */
+  .editor-wrapper { display: flex; flex-direction: column; gap: 12px; }
+  .canvas-container { position: relative; width: 100%; max-width: 600px; height: 450px; background: #fff; border: 2px solid var(--line); border-radius: 10px; overflow: hidden; margin: 0 auto; }
+  .canvas-container canvas { position: absolute; top:0; left:0; width:100%; height:100%; touch-action: none; cursor: crosshair; }
   
+  .palette-column, .layer-column { background: #faf8f3; border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  
+  @media (min-width: 992px) {
+    .editor-wrapper { display: grid; grid-template-columns: 240px 1fr 240px; gap: 16px; align-items: start; }
+    .canvas-container { max-width: 100%; height: 500px; }
+  }
+
+  /* 색상 & 툴 컨트롤 스타일 */
+  .swatch-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 8px 0; }
+  .swatch { height: 28px; border-radius: 6px; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--line); cursor: pointer; }
+  .swatch.active { box-shadow: 0 0 0 2px var(--ink); transform: scale(1.05); }
+  
+  /* 레이어 목록 스타일 */
+  .layer-list { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; margin: 10px 0; }
+  .layer-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; background: #fff; border: 1px solid var(--line); border-radius: 6px; font-size: 12px; cursor: pointer; }
+  .layer-item.active { border-color: var(--accent); background: #fff5f8; font-weight: bold; }
+  .layer-item .btn-group { display: flex; gap: 2px; }
+  .layer-item .btn-group button { padding: 2px 5px; font-size: 10px; }
+
   .grid { display:flex; flex-wrap:wrap; gap:12px; }
   .gallery-card { width: 220px; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; cursor:pointer; transition:transform 0.1s; }
   .gallery-card:hover { transform:translateY(-2px); }
@@ -44,7 +62,7 @@
   .thumb-card { width: 220px; background:#fbfaf5; border:1px solid var(--line); border-radius:10px; padding:10px; font-size:12px; position:relative; }
   .thumb-card.pinned-card { border: 2px solid var(--accent); background:#fff0f5; }
   .thumb-card.hidden-card { opacity: 0.65; border: 1px dashed #888; }
-  .thumb-card img.main-img { width:100%; border-radius:6px; display:block; margin-bottom:6px; background:#fff; cursor:pointer; }
+  .thumb-card img { width:100%; border-radius:6px; display:block; margin-bottom:6px; background:#fff; cursor:pointer; }
   
   .like-btn { background:#fff; color:#666; border:1px solid var(--line); font-size:12px; padding:6px 10px; margin-top:4px; border-radius:6px; width:100%; font-weight:600; }
   .like-btn.liked { background:#ffe3ec; color:var(--accent); border-color:var(--accent); }
@@ -53,18 +71,10 @@
   .admin-actions button { font-size:10px; padding:3px 6px; border-radius:6px; }
   
   .comment-section { margin-top:8px; border-top:1px dashed var(--line); padding-top:8px; }
-  .comment-list { max-height:180px; overflow-y:auto; margin-bottom:8px; display:flex; flex-direction:column; gap:6px; }
+  .comment-list { max-height:140px; overflow-y:auto; margin-bottom:8px; display:flex; flex-direction:column; gap:4px; }
   .comment-item { background:#fff; padding:6px 8px; border-radius:6px; font-size:11px; border:1px solid #f0ebd9; word-break:break-all; position:relative; }
-  .comment-item .c-author { font-weight:bold; color:#333; margin-right:4px; }
-  .comment-item .edited-tag { color:#888; font-size:9px; margin-left:4px; }
-  .comment-actions { display:inline-block; margin-left:6px; }
-  .comment-actions button { font-size:9px; padding:1px 4px; border-radius:4px; background:none; color:#777; border:1px solid #ddd; }
-  .comment-actions button:hover { background:#eee; }
-  
-  /* 그림 댓글 스타일 */
-  .comment-draw-thumb { margin-top:4px; border-radius:4px; border:1px solid var(--line); max-width:100%; height:60px; object-fit:cover; cursor:pointer; display:block; }
 
-  .tool-btn { padding:6px 12px; font-size:12px; background:#eee; color:#333; }
+  .tool-btn { padding:6px 10px; font-size:12px; background:#eee; color:#333; flex: 1; }
   .tool-btn.active { background:var(--ink); color:#fff; }
   .topbar { display:flex; justify-content:space-between; align-items:center; }
   .small { font-size:12px; color:#8a887d; }
@@ -73,18 +83,11 @@
   .msg.ok { color: var(--good); } .msg.no { color: var(--bad); }
   a.home-link { color:#8a887d; font-size:12px; text-decoration:none; }
 
-  /* 모달 스타일 */
   .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; justify-content:center; align-items:center; padding:20px; }
   .modal-overlay.active { display:flex; }
-  .modal-content { max-width:90%; max-height:90%; background:#fff; border-radius:12px; padding:16px; text-align:center; position:relative; overflow-y:auto; }
+  .modal-content { max-width:90%; max-height:90%; background:#fff; border-radius:12px; padding:16px; text-align:center; position:relative; }
   .modal-content img { max-width:100%; max-height:70vh; border-radius:8px; display:block; margin:0 auto; }
   .modal-close { position:absolute; top:8px; right:12px; background:none; border:none; font-size:24px; cursor:pointer; color:#333; }
-
-  /* 그림 수정 댓글 모달 전용 */
-  .edit-draw-container { display:flex; flex-direction:column; align-items:center; gap:8px; text-align:left; }
-  .compare-view { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-top:10px; }
-  .compare-box { text-align:center; }
-  .compare-box img { max-width:300px; height:auto; border-radius:8px; border:1px solid var(--line); }
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -92,28 +95,11 @@
 <body>
 <div id="app"><div class="card">불러오는 중...</div></div>
 
-<!-- 이미지 팝업 모달 -->
-<div class="modal-overlay" id="imgModal" onclick="closeModal('imgModal')">
+<div class="modal-overlay" id="imgModal" onclick="closeModal()">
   <div class="modal-content" onclick="event.stopPropagation()">
-    <button class="modal-close" onclick="closeModal('imgModal')">&times;</button>
-    <div id="modalBody"></div>
-  </div>
-</div>
-
-<!-- 그림 수정 댓글 캔버스 모달 -->
-<div class="modal-overlay" id="editDrawModal">
-  <div class="modal-content" style="max-width:540px;" onclick="event.stopPropagation()">
-    <button class="modal-close" onclick="closeModal('editDrawModal')">&times;</button>
-    <h3 style="margin-top:0;">🎨 그림 덧그리기 / 수정하기</h3>
-    <div class="edit-draw-container">
-      <canvas id="editCommentCanvas"></canvas>
-      <div id="editBrushControls"></div>
-      <input type="text" id="editCommentText" placeholder="수정 소감이나 댓글 입력..." style="width:100%; margin-top:6px;">
-      <div class="row" style="width:100%; justify-content:flex-end; margin-top:8px;">
-        <button class="ghost" onclick="closeModal('editDrawModal')">취소</button>
-        <button id="saveEditCommentBtn">댓글 및 그림 등록</button>
-      </div>
-    </div>
+    <button class="modal-close" onclick="closeModal()">&times;</button>
+    <img id="modalImg" src="">
+    <div id="modalCaption" style="margin-top:10px; font-weight:bold; font-size:14px;"></div>
   </div>
 </div>
 
@@ -129,13 +115,14 @@ let currentBrush = { color:'#26251f', opacity: 1.0, size:4, tool:'brush' };
 let drawing = false;
 let visitorId = null;
 
+// 레이어 및 Undo/Redo 상태 관리
+let layers = [];
+let activeLayerIndex = 0;
+let layerIdCounter = 0;
 let undoStack = [];
 let redoStack = [];
-const MAX_UNDO = 100;
-let currentActiveCanvas = null;
+const MAX_UNDO = 30;
 let currentActiveGalleryId = null;
-
-let activeEditTargetSub = null; // 수정 중인 그림 정보
 
 function escapeHtml(s){ const d = document.createElement('div'); d.innerText = s == null ? '' : String(s); return d.innerHTML; }
 function genId(len){
@@ -144,32 +131,12 @@ function genId(len){
   return s;
 }
 
-function openModal(id){ document.getElementById(id).classList.add('active'); }
-function closeModal(id){ document.getElementById(id).classList.remove('active'); }
-
-function showImageModal(imgSrc, caption){
-  const body = document.getElementById('modalBody');
-  body.innerHTML = `<img src="${imgSrc}"><div style="margin-top:10px; font-weight:bold;">${escapeHtml(caption)}</div>`;
-  openModal('imgModal');
+function openModal(imgSrc, caption){
+  document.getElementById('modalImg').src = imgSrc;
+  document.getElementById('modalCaption').innerText = caption || '';
+  document.getElementById('imgModal').classList.add('active');
 }
-
-function showCompareModal(origImg, editedImg, author, editor){
-  const body = document.getElementById('modalBody');
-  body.innerHTML = `
-    <h3>🖼️ 그림 비교하기</h3>
-    <div class="compare-view">
-      <div class="compare-box">
-        <div class="small" style="font-weight:bold; margin-bottom:4px;">🎨 원본 (${escapeHtml(author)})</div>
-        <img src="${origImg}">
-      </div>
-      <div class="compare-box">
-        <div class="small" style="font-weight:bold; margin-bottom:4px; color:var(--accent);">✏️ 수정본 (${escapeHtml(editor)})</div>
-        <img src="${editedImg}">
-      </div>
-    </div>
-  `;
-  openModal('imgModal');
-}
+function closeModal(){ document.getElementById('imgModal').classList.remove('active'); }
 
 async function getVisitorId(){
   if(visitorId) return visitorId;
@@ -179,9 +146,7 @@ async function getVisitorId(){
   return visitorId;
 }
 
-function isMasterAdmin(){
-  return localStorage.getItem('is-master-admin') === 'true';
-}
+function isMasterAdmin(){ return localStorage.getItem('is-master-admin') === 'true'; }
 
 // ---------------- API ----------------
 async function loadGallery(id){
@@ -245,10 +210,7 @@ async function addSub(id, item){
 async function updateSub(item){
   try {
     const { error } = await supabaseClient.from('submissions').update({
-      pinned: item.pinned,
-      hidden: item.hidden,
-      likes: item.likes,
-      liked_by: item.likedBy
+      pinned: item.pinned, hidden: item.hidden, likes: item.likes, liked_by: item.likedBy
     }).eq('id', item.id);
     return !error;
   } catch(e){ return false; }
@@ -269,17 +231,11 @@ async function loadComments(subId){
   } catch(e){ return []; }
 }
 
-async function addComment(subId, author, content, editedImage=null){
+async function addComment(subId, author, content){
   try {
     const vId = await getVisitorId();
     const { error } = await supabaseClient.from('comments').insert({
-      id: genId(10),
-      submission_id: subId,
-      author: author || '익명',
-      content: content,
-      edited_image: editedImage,
-      visitor_id: vId,
-      is_edited: false
+      id: genId(10), submission_id: subId, author: author || '익명', content: content, visitor_id: vId, is_edited: false
     });
     return !error;
   } catch(e){ return false; }
@@ -287,10 +243,7 @@ async function addComment(subId, author, content, editedImage=null){
 
 async function updateComment(cid, newContent){
   try {
-    const { error } = await supabaseClient.from('comments').update({
-      content: newContent,
-      is_edited: true
-    }).eq('id', cid);
+    const { error } = await supabaseClient.from('comments').update({ content: newContent, is_edited: true }).eq('id', cid);
     return !error;
   } catch(e){ return false; }
 }
@@ -304,7 +257,6 @@ async function deleteComment(cid){
 
 function route(){
   if(pollTimer){ clearInterval(pollTimer); pollTimer = null; }
-  currentActiveCanvas = null;
   currentActiveGalleryId = null;
   const hash = location.hash.replace('#','');
   if(hash.startsWith('owner=')){
@@ -316,45 +268,35 @@ function route(){
 }
 addEventListener('hashchange', route);
 
-// ---------------- Key Bindings (Ctrl+Z, Ctrl+Y) ----------------
+// ---------------- 키보드 단축키 (Ctrl+Z, Ctrl+Y) ----------------
 window.addEventListener('keydown', (e) => {
-  if (!currentActiveCanvas) return;
   const activeEl = document.activeElement;
   if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) return;
 
   if (e.ctrlKey || e.metaKey) {
     if (e.key.toLowerCase() === 'z') {
-      if (e.shiftKey) { redo(currentActiveCanvas, currentActiveGalleryId); } 
-      else { undo(currentActiveCanvas, currentActiveGalleryId); }
+      if (e.shiftKey) { redo(); } 
+      else { undo(); }
       e.preventDefault();
     } else if (e.key.toLowerCase() === 'y') {
-      redo(currentActiveCanvas, currentActiveGalleryId);
+      redo();
       e.preventDefault();
     }
   }
 });
 
-// ---------------- Cover Image Priority Calculation ----------------
 function determineGalleryCover(gallery, visibleSubs){
   if(visibleSubs.length === 0) return null;
-
-  if(gallery.cover_image && visibleSubs.some(s=>s.image === gallery.cover_image)){
-    return gallery.cover_image;
-  }
+  if(gallery.cover_image && visibleSubs.some(s=>s.image === gallery.cover_image)) return gallery.cover_image;
 
   const pinnedSubs = visibleSubs.filter(s => s.pinned);
-  if(pinnedSubs.length > 0){
-    const randomIndex = Math.floor(Math.random() * pinnedSubs.length);
-    return pinnedSubs[randomIndex].image;
-  }
+  if(pinnedSubs.length > 0) return pinnedSubs[Math.floor(Math.random() * pinnedSubs.length)].image;
 
   const maxLikes = Math.max(...visibleSubs.map(s => s.likes || 0));
   if(maxLikes > 0){
     const topLikedSubs = visibleSubs.filter(s => (s.likes || 0) === maxLikes);
-    const randomIndex = Math.floor(Math.random() * topLikedSubs.length);
-    return topLikedSubs[randomIndex].image;
+    return topLikedSubs[Math.floor(Math.random() * topLikedSubs.length)].image;
   }
-
   return visibleSubs[0].image;
 }
 
@@ -410,9 +352,7 @@ async function renderHome(){
         localStorage.setItem('is-master-admin', 'true');
         alert('마스터 관리자로 로그인되었습니다!');
         renderHome();
-      } else if(pw !== null) {
-        alert('비밀번호가 올바르지 않습니다.');
-      }
+      } else if(pw !== null) alert('비밀번호가 올바르지 않습니다.');
     }
   };
 
@@ -429,8 +369,7 @@ async function renderHome(){
       localStorage.setItem(`owner_key_${id}`, ownerKey);
       location.hash = `owner=${id}&key=${ownerKey}`; 
     } else { 
-      alert('생성 실패! DB 연결 권한을 확인해 주세요.'); 
-      btn.disabled = false; btn.innerText = '✏️ 갤러리 생성'; 
+      alert('생성 실패!'); btn.disabled = false; btn.innerText = '✏️ 갤러리 생성'; 
     }
   };
 
@@ -472,12 +411,11 @@ async function renderHome(){
     gallerySort = e.target.value;
     loadGalleries(document.getElementById('searchInput').value.trim());
   };
-
   document.getElementById('searchBtn').onclick = ()=>{ loadGalleries(document.getElementById('searchInput').value.trim()); };
   loadGalleries();
 }
 
-// ---------------- Canvas & Performance Optimization ----------------
+// ---------------- Multi-Layer Engine & Canvas System ----------------
 function getRgbaColor(hex, opacity){
   let c = hex.replace('#','');
   if(c.length === 3) c = c.split('').map(x=>x+x).join('');
@@ -485,45 +423,152 @@ function getRgbaColor(hex, opacity){
   return `rgba(${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}, ${opacity})`;
 }
 
-function saveState(canvas, galleryId){
-  const ctx = canvas.getContext('2d');
+// 전체 레이어의 상태 스냅샷 저장 (Undo/Redo 지원)
+function saveState(){
   if(undoStack.length >= MAX_UNDO) undoStack.shift();
-  undoStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+  const snapshot = layers.map(layer => {
+    const ctx = layer.canvas.getContext('2d');
+    return {
+      id: layer.id,
+      name: layer.name,
+      visible: layer.visible,
+      opacity: layer.opacity,
+      imgData: ctx.getImageData(0, 0, layer.canvas.width, layer.canvas.height)
+    };
+  });
+  undoStack.push({ snapshot, activeIndex: activeLayerIndex });
   redoStack = [];
-  if(galleryId) {
-    try { localStorage.setItem(`draft-canvas-${galleryId}`, canvas.toDataURL('image/png')); } catch(e){}
+}
+
+function undo(){
+  if(undoStack.length <= 1) return;
+  redoStack.push(undoStack.pop());
+  const state = undoStack[undoStack.length - 1];
+  restoreState(state);
+}
+
+function redo(){
+  if(redoStack.length === 0) return;
+  const state = redoStack.pop();
+  undoStack.push(state);
+  restoreState(state);
+}
+
+function restoreState(state){
+  const container = document.getElementById('canvasContainer');
+  if(!container) return;
+  container.innerHTML = '';
+  layers = [];
+
+  state.snapshot.forEach(item => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 600; canvas.height = 450;
+    canvas.style.opacity = item.opacity;
+    canvas.style.display = item.visible ? 'block' : 'none';
+    const ctx = canvas.getContext('2d');
+    ctx.putImageData(item.imgData, 0, 0);
+    container.appendChild(canvas);
+    layers.push({ id: item.id, name: item.name, visible: item.visible, opacity: item.opacity, canvas });
+  });
+
+  activeLayerIndex = Math.min(state.activeIndex, layers.length - 1);
+  renderLayerUI();
+}
+
+function clearUndoHistory(){
+  undoStack = [];
+  redoStack = [];
+  if(currentActiveGalleryId) {
+    localStorage.removeItem(`draft-canvas-${currentActiveGalleryId}`);
   }
 }
 
-function undo(canvas, galleryId){
-  if(undoStack.length <= 1) return;
-  const ctx = canvas.getContext('2d');
-  redoStack.push(undoStack.pop());
-  const prevState = undoStack[undoStack.length - 1];
-  ctx.putImageData(prevState, 0, 0);
-  if(galleryId) localStorage.setItem(`draft-canvas-${galleryId}`, canvas.toDataURL('image/png'));
+function addLayer(name){
+  if(layers.length >= 10){ alert('레이어는 최대 10개까지 추가 가능합니다.'); return; }
+  const container = document.getElementById('canvasContainer');
+  const canvas = document.createElement('canvas');
+  canvas.width = 600; canvas.height = 450;
+  
+  layerIdCounter++;
+  const layerName = name || `레이어 ${layerIdCounter}`;
+  container.appendChild(canvas);
+
+  const newLayer = { id: layerIdCounter, name: layerName, visible: true, opacity: 1.0, canvas };
+  layers.push(newLayer);
+  activeLayerIndex = layers.length - 1;
+
+  saveState();
+  renderLayerUI();
 }
 
-function redo(canvas, galleryId){
-  if(redoStack.length === 0) return;
-  const ctx = canvas.getContext('2d');
-  const nextState = redoStack.pop();
-  undoStack.push(nextState);
-  ctx.putImageData(nextState, 0, 0);
-  if(galleryId) localStorage.setItem(`draft-canvas-${galleryId}`, canvas.toDataURL('image/png'));
+function removeLayer(index){
+  if(layers.length <= 1){ alert('최소 1개의 레이어가 필요합니다.'); return; }
+  layers[index].canvas.remove();
+  layers.splice(index, 1);
+  if(activeLayerIndex >= layers.length) activeLayerIndex = layers.length - 1;
+  saveState();
+  renderLayerUI();
+}
+
+function moveLayer(index, dir){
+  const newIndex = index + dir;
+  if(newIndex < 0 || newIndex >= layers.length) return;
+
+  const temp = layers[index];
+  layers[index] = layers[newIndex];
+  layers[newIndex] = temp;
+
+  const container = document.getElementById('canvasContainer');
+  container.innerHTML = '';
+  layers.forEach(l => container.appendChild(l.canvas));
+
+  activeLayerIndex = newIndex;
+  saveState();
+  renderLayerUI();
+}
+
+function renderLayerUI(){
+  const list = document.getElementById('layerList');
+  if(!list) return;
+  list.innerHTML = '';
+
+  for(let i = layers.length - 1; i >= 0; i--){
+    const layer = layers[i];
+    const item = document.createElement('div');
+    item.className = `layer-item ${i === activeLayerIndex ? 'active' : ''}`;
+    item.onclick = () => { activeLayerIndex = i; renderLayerUI(); };
+
+    item.innerHTML = `
+      <span>${layer.visible ? '👁️' : '🙈'} ${escapeHtml(layer.name)}</span>
+      <div class="btn-group" onclick="event.stopPropagation()">
+        <button class="ghost" onclick="toggleLayerVis(${i})">${layer.visible ? '숨기기' : '보이기'}</button>
+        <button class="ghost" onclick="moveLayer(${i}, 1)">▲</button>
+        <button class="ghost" onclick="moveLayer(${i}, -1)">▼</button>
+        <button class="danger" onclick="removeLayer(${i})">✕</button>
+      </div>
+    `;
+    list.appendChild(item);
+  }
+}
+
+function toggleLayerVis(index){
+  layers[index].visible = !layers[index].visible;
+  layers[index].canvas.style.display = layers[index].visible ? 'block' : 'none';
+  saveState();
+  renderLayerUI();
 }
 
 function floodFill(canvas, startX, startY, fillColorRgba){
   const ctx = canvas.getContext('2d');
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const data = imgData.data;
-  
+
   const temp = document.createElement('div');
   temp.style.color = fillColorRgba;
   document.body.appendChild(temp);
   const cs = window.getComputedStyle(temp).color.match(/[\d.]+/g).map(Number);
   document.body.removeChild(temp);
-  
+
   const fillR = cs[0], fillG = cs[1], fillB = cs[2], fillA = Math.round((cs[3] !== undefined ? cs[3] : 1) * 255);
   const targetIdx = (Math.floor(startY) * canvas.width + Math.floor(startX)) * 4;
   const startR = data[targetIdx], startG = data[targetIdx+1], startB = data[targetIdx+2], startA = data[targetIdx+3];
@@ -552,58 +597,38 @@ function floodFill(canvas, startX, startY, fillColorRgba){
   ctx.putImageData(imgData, 0, 0);
 }
 
-function setupCanvas(canvas, galleryId, initialImageSrc=null){
-  currentActiveCanvas = canvas;
+function setupMultiLayerStudio(galleryId){
   currentActiveGalleryId = galleryId;
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  canvas.width = 480; canvas.height = 360;
-  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  undoStack = []; redoStack = [];
+  const container = document.getElementById('canvasContainer');
+  container.innerHTML = '';
+  layers = [];
+  layerIdCounter = 0;
+  undoStack = [];
+  redoStack = [];
 
-  ctx.fillStyle = '#ffffff'; 
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  if(initialImageSrc){
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = ()=>{ 
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height); 
-      saveState(canvas, null); 
-    };
-    img.src = initialImageSrc;
-  } else {
-    const savedDraft = galleryId ? localStorage.getItem(`draft-canvas-${galleryId}`) : null;
-    if(savedDraft){
-      const img = new Image();
-      img.onload = ()=>{ 
-        ctx.drawImage(img, 0, 0); 
-        saveState(canvas, galleryId); 
-      };
-      img.src = savedDraft;
-    } else { 
-      saveState(canvas, galleryId);
-    }
-  }
-
+  addLayer('배경 레이어');
+  
   let last = null;
   let isFramePending = false;
 
   function pos(e){
-    const rect = canvas.getBoundingClientRect();
+    const rect = container.getBoundingClientRect();
     return { 
-      x: (e.clientX - rect.left) * (canvas.width / rect.width), 
-      y: (e.clientY - rect.top) * (canvas.height / rect.height)
+      x: (e.clientX - rect.left) * (600 / rect.width), 
+      y: (e.clientY - rect.top) * (450 / rect.height)
     };
   }
 
   function start(e){
+    if(layers.length === 0 || !layers[activeLayerIndex].visible) return;
     e.preventDefault();
     const p = pos(e);
+    const activeCanvas = layers[activeLayerIndex].canvas;
     const activeColor = getRgbaColor(currentBrush.color, currentBrush.opacity);
 
     if(currentBrush.tool === 'fill'){
-      floodFill(canvas, p.x, p.y, activeColor);
-      saveState(canvas, galleryId);
+      floodFill(activeCanvas, p.x, p.y, activeColor);
+      saveState();
       return;
     }
     drawing = true; last = p;
@@ -617,7 +642,11 @@ function setupCanvas(canvas, galleryId, initialImageSrc=null){
     if(!isFramePending){
       isFramePending = true;
       requestAnimationFrame(()=>{
+        const activeCanvas = layers[activeLayerIndex].canvas;
+        const ctx = activeCanvas.getContext('2d');
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
         ctx.strokeStyle = getRgbaColor(currentBrush.color, currentBrush.opacity);
+        
         let calculatedWidth = currentBrush.size;
         if (e.pointerType === 'pen' && e.pressure > 0) calculatedWidth = currentBrush.size * (e.pressure * 2); 
         ctx.lineWidth = Math.max(0.5, calculatedWidth);
@@ -628,58 +657,54 @@ function setupCanvas(canvas, galleryId, initialImageSrc=null){
     }
   }
 
-  function end(){ if(drawing){ drawing = false; saveState(canvas, galleryId); } }
+  function end(){ if(drawing){ drawing = false; saveState(); } }
 
-  canvas.addEventListener('pointerdown', start);
-  canvas.addEventListener('pointermove', move);
+  container.addEventListener('pointerdown', start);
+  container.addEventListener('pointermove', move);
   window.addEventListener('pointerup', end);
-  return ctx;
 }
 
-// ---------------- Palette UI Component ----------------
-function brushControlsHtml(uniquePrefix=''){
+// ---------------- Palette & Layer UI Binding ----------------
+function brushControlsHtml(){
   const colors = ['#26251f','#d9534f','#f582ae','#f0ad4e','#3aa655','#3a8fd9','#8b5aa8','#ffffff'];
   return `
-    <div class="row" style="margin-top:10px; gap:6px;">
-      <button type="button" class="tool-btn active" id="${uniquePrefix}toolBrush">🖌️ 붓</button>
-      <button type="button" class="tool-btn" id="${uniquePrefix}toolFill">🪣 채우기</button>
-      <div style="border-left:1px solid #ccc; height:20px; margin:0 4px;"></div>
-      ${colors.map(c=>`<span class="swatch ${c==='#26251f'?'active':''}" data-color="${c}" style="background:${c}; ${c==='#ffffff'?'box-shadow:0 0 0 1px #ccc;':''}"></span>`).join('')}
-      <div class="color-picker-wrapper">
-        <label for="${uniquePrefix}customColorPicker" style="cursor:pointer; font-weight:600; color:#555;">🎨 팔레트</label>
-        <input type="color" id="${uniquePrefix}customColorPicker" value="#26251f">
-      </div>
+    <div class="row" style="gap:4px; margin-bottom:8px;">
+      <button type="button" class="tool-btn active" id="toolBrush">🖌️ 붓</button>
+      <button type="button" class="tool-btn" id="toolFill">🪣 채우기</button>
     </div>
-    <div class="row" style="margin-top:8px;">
-      <span class="small">굵기:</span>
-      <input type="range" min="1" max="50" value="4" id="${uniquePrefix}brushSize" style="width:70px;">
-      <span class="small" id="${uniquePrefix}brushSizeVal">4px</span>
-      <div style="border-left:1px solid #ccc; height:16px; margin:0 4px;"></div>
-      <span class="small">투명도:</span>
-      <input type="range" min="5" max="100" value="100" id="${uniquePrefix}brushOpacity" style="width:70px;">
-      <span class="small" id="${uniquePrefix}brushOpacityVal">100%</span>
+    <div style="font-size:12px; font-weight:bold; margin-bottom:4px;">색상 선택</div>
+    <div class="swatch-grid">
+      ${colors.map(c=>`<span class="swatch ${c==='#26251f'?'active':''}" data-color="${c}" style="background:${c};"></span>`).join('')}
     </div>
-    <div class="row" style="margin-top:8px;">
-      <button class="ghost" id="${uniquePrefix}undoBtn" type="button" style="padding:4px 10px; font-size:12px;">↩️ 뒤로 (Ctrl+Z)</button>
-      <button class="ghost" id="${uniquePrefix}redoBtn" type="button" style="padding:4px 10px; font-size:12px;">↪️ 다시 (Ctrl+Y)</button>
-      <button class="ghost" id="${uniquePrefix}clearBtn" type="button" style="padding:4px 10px; font-size:12px; color:var(--bad);">🗑️ 초기화</button>
+    <div class="row" style="margin-bottom:8px;">
+      <input type="color" id="customColorPicker" value="#26251f" style="width:100%; height:32px; border-radius:6px; cursor:pointer; border:1px solid var(--line);">
+    </div>
+    <div style="margin-top:8px;">
+      <span class="small">굵기: <b id="brushSizeVal">4px</b></span>
+      <input type="range" min="1" max="50" value="4" id="brushSize" style="width:100%;">
+    </div>
+    <div style="margin-top:8px;">
+      <span class="small">투명도: <b id="brushOpacityVal">100%</b></span>
+      <input type="range" min="5" max="100" value="100" id="brushOpacity" style="width:100%;">
+    </div>
+    <div style="margin-top:12px; display:flex; flex-direction:column; gap:4px;">
+      <button class="ghost" id="undoBtn" type="button">↩️ 뒤로 (Ctrl+Z)</button>
+      <button class="ghost" id="redoBtn" type="button">↪️ 다시 (Ctrl+Y)</button>
+      <button class="ghost" id="clearBtn" type="button" style="color:var(--bad);">🗑️ 전체 초기화</button>
     </div>`;
 }
 
-function bindBrushControls(scope, galleryId, uniquePrefix=''){
-  const canvas = scope.querySelector('canvas');
-  
+function bindBrushControls(scope){
   scope.querySelectorAll('.swatch').forEach(s=>{
     s.onclick = ()=>{ 
       currentBrush.color = s.dataset.color; 
       scope.querySelectorAll('.swatch').forEach(x=>x.classList.remove('active')); 
       s.classList.add('active'); 
-      const cp = scope.querySelector(`#${uniquePrefix}customColorPicker`);
-      if(cp) cp.value = currentBrush.color.length === 7 ? currentBrush.color : '#26251f';
+      scope.querySelector('#customColorPicker').value = currentBrush.color.length === 7 ? currentBrush.color : '#26251f';
     };
   });
 
-  const colorPicker = scope.querySelector(`#${uniquePrefix}customColorPicker`);
+  const colorPicker = scope.querySelector('#customColorPicker');
   if(colorPicker){
     colorPicker.oninput = (e)=>{
       currentBrush.color = e.target.value;
@@ -687,48 +712,34 @@ function bindBrushControls(scope, galleryId, uniquePrefix=''){
     };
   }
 
-  const tBrush = scope.querySelector(`#${uniquePrefix}toolBrush`);
-  const tFill = scope.querySelector(`#${uniquePrefix}toolFill`);
+  const tBrush = scope.querySelector('#toolBrush');
+  const tFill = scope.querySelector('#toolFill');
   if(tBrush && tFill){
     tBrush.onclick = ()=>{ currentBrush.tool='brush'; tBrush.classList.add('active'); tFill.classList.remove('active'); };
     tFill.onclick = ()=>{ currentBrush.tool='fill'; tFill.classList.add('active'); tBrush.classList.remove('active'); };
   }
 
-  const bSize = scope.querySelector(`#${uniquePrefix}brushSize`);
-  if(bSize){
-    bSize.oninput = (e)=>{ 
-      currentBrush.size = parseInt(e.target.value); 
-      scope.querySelector(`#${uniquePrefix}brushSizeVal`).textContent = `${currentBrush.size}px`;
-    };
-  }
+  scope.querySelector('#brushSize').oninput = (e)=>{ 
+    currentBrush.size = parseInt(e.target.value); 
+    scope.querySelector('#brushSizeVal').textContent = `${currentBrush.size}px`;
+  };
 
-  const bOpacity = scope.querySelector(`#${uniquePrefix}brushOpacity`);
-  if(bOpacity){
-    bOpacity.oninput = (e)=>{
-      const val = parseInt(e.target.value);
-      currentBrush.opacity = val / 100;
-      scope.querySelector(`#${uniquePrefix}brushOpacityVal`).textContent = `${val}%`;
-    };
-  }
+  scope.querySelector('#brushOpacity').oninput = (e)=>{
+    const val = parseInt(e.target.value);
+    currentBrush.opacity = val / 100;
+    scope.querySelector('#brushOpacityVal').textContent = `${val}%`;
+  };
 
-  const undoBtn = scope.querySelector(`#${uniquePrefix}undoBtn`);
-  if(undoBtn) undoBtn.onclick = ()=> undo(canvas, galleryId);
-
-  const redoBtn = scope.querySelector(`#${uniquePrefix}redoBtn`);
-  if(redoBtn) redoBtn.onclick = ()=> redo(canvas, galleryId);
-
-  const clearBtn = scope.querySelector(`#${uniquePrefix}clearBtn`);
-  if(clearBtn){
-    clearBtn.onclick = ()=>{
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height);
-      if(galleryId) localStorage.removeItem(`draft-canvas-${galleryId}`);
-      saveState(canvas, galleryId);
-    };
-  }
+  scope.querySelector('#undoBtn').onclick = () => undo();
+  scope.querySelector('#redoBtn').onclick = () => redo();
+  scope.querySelector('#clearBtn').onclick = ()=>{
+    if(confirm('전체 그리기 영역을 초기화하시겠습니까?')){
+      setupMultiLayerStudio(currentActiveGalleryId);
+    }
+  };
 }
 
-// ---------------- Gallery & Admin View ----------------
+// ---------------- Gallery & Visitor View ----------------
 async function renderVisitor(id, keyFromUrl=null){
   const gallery = await loadGallery(id);
   if(!gallery){
@@ -758,12 +769,12 @@ async function renderVisitor(id, keyFromUrl=null){
     </div>
 
     ${canManage ? `
-      <div class="card" style="background:#f4f9f5; border-color:var(--good);">
+      <div class="card" style="background:#f4f9f5; border-color:var(--good); margin-bottom:12px;">
         <div class="row" style="justify-content:space-between; margin-bottom:8px;">
           <h2 style="margin:0;">⚙️ 갤러리 관리 옵션</h2>
           <button class="danger" id="deleteGalleryBtn" style="padding:4px 10px; font-size:11px;">🚨 갤러리 삭제</button>
         </div>
-        <div class="row" style="margin-bottom:8px;">
+        <div class="row">
           <input type="text" id="galleryTitle" value="${escapeHtml(gallery.title)}" placeholder="갤러리 이름" style="flex:1;">
           <select id="galleryPublic">
             <option value="true" ${gallery.is_public?'selected':''}>🌐 공개</option>
@@ -775,25 +786,39 @@ async function renderVisitor(id, keyFromUrl=null){
     ` : ''}
 
     <div class="card">
-      <h2>✏️ 캔버스에 그림 그리기</h2>
-      ${isBanned ? `<p style="color:var(--bad); font-weight:bold; font-size:13px;">🚫 이 갤러리에서 차단되어 그림을 업로드할 수 없습니다.</p>` : ''}
-      <div class="row" style="margin-bottom:8px;">
-        <input type="text" id="authorName" placeholder="내 닉네임 (선택)" value="${escapeHtml(savedName)}" style="flex:1; max-width:240px;" ${isBanned?'disabled':''}>
+      <div class="row" style="justify-content:space-between; margin-bottom:8px;">
+        <h2>✏️ 캔버스에 그림 그리기</h2>
+        <input type="text" id="authorName" placeholder="내 닉네임 (선택)" value="${escapeHtml(savedName)}" style="max-width:200px;" ${isBanned?'disabled':''}>
       </div>
-      <canvas id="draw"></canvas>
-      ${brushControlsHtml()}
-      <div class="row" style="margin-top:10px;">
-        <button id="submitBtn" ${isBanned?'disabled':''}>작품 등록하기</button>
+
+      <!-- PC 반응형 3컬럼 스튜디오 배치 -->
+      <div class="editor-wrapper">
+        <div class="palette-column">
+          ${brushControlsHtml()}
+        </div>
+        
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div class="canvas-container" id="canvasContainer"></div>
+          <button id="submitBtn" style="width:100%; padding:12px; font-size:15px;" ${isBanned?'disabled':''}>작품 등록하기</button>
+          <div class="msg" id="submitMsg"></div>
+        </div>
+
+        <div class="layer-column">
+          <div class="row" style="justify-content:space-between; margin-bottom:8px;">
+            <span style="font-weight:bold; font-size:13px;">📚 레이어 (최대 10개)</span>
+            <button class="secondary" onclick="addLayer()" style="padding:2px 6px; font-size:11px;">+ 추가</button>
+          </div>
+          <div class="layer-list" id="layerList"></div>
+        </div>
       </div>
-      <div class="msg" id="submitMsg"></div>
     </div>
 
     <div class="row" style="justify-content:space-between; margin:16px 0 8px;">
       <div class="row" style="gap:12px;">
         <h2 style="margin:0;">작품 목록</h2>
         ${canManage ? `
-          <label class="filter-toggle">
-            <input type="checkbox" id="privateFilterToggle"> 👁️ 비공개 그림 포함 (ON)
+          <label style="font-size:12px; cursor:pointer;">
+            <input type="checkbox" id="privateFilterToggle"> 👁️ 비공개 포함
           </label>
         ` : ''}
       </div>
@@ -807,9 +832,6 @@ async function renderVisitor(id, keyFromUrl=null){
     <div id="subFeed" class="grid"><span class="small">불러오는 중...</span></div>
   `;
 
-  // 댓글용 덧그리기 모달 초기화
-  document.getElementById('editBrushControls').innerHTML = brushControlsHtml('edit_');
-
   const filterToggle = document.getElementById('privateFilterToggle');
   if(filterToggle){
     filterToggle.onchange = (e) => {
@@ -820,9 +842,7 @@ async function renderVisitor(id, keyFromUrl=null){
 
   const authorInput = document.getElementById('authorName');
   if(authorInput){
-    authorInput.oninput = (e)=>{
-      localStorage.setItem('visitor-nickname', e.target.value.trim());
-    };
+    authorInput.oninput = (e)=>{ localStorage.setItem('visitor-nickname', e.target.value.trim()); };
   }
 
   if(canManage){
@@ -837,7 +857,7 @@ async function renderVisitor(id, keyFromUrl=null){
     const delGBtn = document.getElementById('deleteGalleryBtn');
     if(delGBtn){
       delGBtn.onclick = async ()=>{
-        if(confirm('이 갤러리를 완전히 삭제하시겠습니까? 등록된 작품들과 댓글이 모두 삭제됩니다.')){
+        if(confirm('이 갤러리를 완전히 삭제하시겠습니까?')){
           await supabaseClient.from('submissions').delete().eq('gallery_id', id);
           await supabaseClient.from('gallery').delete().eq('id', id);
           alert('갤러리가 삭제되었습니다.');
@@ -847,9 +867,8 @@ async function renderVisitor(id, keyFromUrl=null){
     }
   }
 
-  const canvas = document.getElementById('draw');
-  setupCanvas(canvas, id);
-  bindBrushControls(document, id);
+  setupMultiLayerStudio(id);
+  bindBrushControls(document);
 
   document.getElementById('submitBtn').onclick = async ()=>{
     const submitBtn = document.getElementById('submitBtn');
@@ -862,11 +881,8 @@ async function renderVisitor(id, keyFromUrl=null){
 
     const lastUpload = parseInt(localStorage.getItem(`last-upload-${id}`) || '0');
     const now = Date.now();
-    const cooldown = 10000;
-
-    if (now - lastUpload < cooldown) {
-      const remainSec = Math.ceil((cooldown - (now - lastUpload)) / 1000);
-      msg.textContent = `⚡ 도배 방지: 너무 빠른 연속 요청입니다. ${remainSec}초 후 다시 시도해주세요.`;
+    if (now - lastUpload < 10000) {
+      msg.textContent = `⚡ 도배 방지: ${Math.ceil((10000 - (now - lastUpload)) / 1000)}초 후 다시 시도해주세요.`;
       msg.className = 'msg no';
       return;
     }
@@ -874,13 +890,20 @@ async function renderVisitor(id, keyFromUrl=null){
     submitBtn.disabled = true;
     msg.textContent = '업로드 중...'; msg.className = 'msg';
 
+    // 레이어 합성: 600x450 크기의 백그라운드 캔버스에 레이어들을 순서대로 합침[cite: 2]
     const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = canvas.width;
-    tempCanvas.height = canvas.height;
+    tempCanvas.width = 600; tempCanvas.height = 450;
     const tempCtx = tempCanvas.getContext('2d');
+    
     tempCtx.fillStyle = '#ffffff';
     tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-    tempCtx.drawImage(canvas, 0, 0);
+
+    layers.forEach(l => {
+      if(l.visible){
+        tempCtx.globalAlpha = l.opacity;
+        tempCtx.drawImage(l.canvas, 0, 0);
+      }
+    });
 
     const image = tempCanvas.toDataURL('image/png');
     const author = document.getElementById('authorName').value.trim() || '익명';
@@ -891,12 +914,12 @@ async function renderVisitor(id, keyFromUrl=null){
 
     if(ok){
       localStorage.setItem(`last-upload-${id}`, Date.now());
-      localStorage.removeItem(`draft-canvas-${id}`);
       
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height);
-      saveState(canvas, id);
-      msg.textContent = '그림 제출 완료! 🎉'; msg.className='msg ok';
+      // ✅ [요청 반영] 작품 등록 후 이전 그리던 이미지 데이터 및 히스토리 완전 삭제
+      clearUndoHistory();
+      setupMultiLayerStudio(id);
+
+      msg.textContent = '작품 제출 완료! 🎉'; msg.className='msg ok';
       refreshFeed();
     } else {
       msg.textContent = '업로드에 실패했습니다. 다시 시도해주세요.'; msg.className='msg no';
@@ -912,10 +935,7 @@ async function renderVisitor(id, keyFromUrl=null){
     if(document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
 
     let subs = await loadSubs(id);
-
-    if(!canManage || !showPrivateFilter) {
-      subs = subs.filter(s=>!s.hidden); 
-    }
+    if(!canManage || !showPrivateFilter) subs = subs.filter(s=>!s.hidden); 
 
     const feed = document.getElementById('subFeed');
     if(!feed) return;
@@ -942,20 +962,21 @@ async function renderVisitor(id, keyFromUrl=null){
           ${isCover ? '<span class="badge public">🖼️ 대표 썸네일</span>' : ''}
           ${s.pinned ? '<span class="badge pinned">📌 고정됨</span>' : ''}
           ${s.hidden ? '<span class="badge hidden">🔒 비공개</span>' : ''}
-          <img class="main-img" src="${s.image}" onclick="showImageModal('${s.image}', '${escapeHtml(s.author || '익명')}님의 작품')">
+          <img src="${s.image}" onclick="openModal('${s.image}', '${escapeHtml(s.author || '익명')}님의 작품')">
           
           <button class="like-btn ${isLiked ? 'liked' : ''}" data-sid="${s.id}">
             ${isLiked ? '💖 좋아요 완료' : '🤍 좋아요'} (${s.likes||0})
           </button>
           
-          <div class="admin-actions">
-            <button class="secondary editDrawBtn" style="background:#e8def8; color:#4a4458;">✏️ 덧그리기/수정</button>
-            ${canManage ? `<button class="secondary setCoverBtn">${isCover ? '🖼️ 썸네일 해제' : '🖼️ 썸네일 지정'}</button>` : ''}
-            ${canManage ? `<button class="ghost pinBtn">${s.pinned ? '📌 고정해제' : '📌 고정'}</button>` : ''}
-            ${canManage ? `<button class="ghost hideBtn">${s.hidden ? '👁️ 공개' : '🔒 비공개'}</button>` : ''}
-            ${(canManage && !isMine) ? `<button class="danger banUserBtn">${isAuthorBanned ? '🔓 차단해제' : '🚫 유저 밴'}</button>` : ''}
-            ${(canManage || isMine) ? `<button class="danger deleteBtn">🗑️ 삭제</button>` : ''}
-          </div>
+          ${(canManage || isMine) ? `
+            <div class="admin-actions">
+              ${canManage ? `<button class="secondary setCoverBtn">${isCover ? '🖼️ 썸네일 해제' : '🖼️ 썸네일 지정'}</button>` : ''}
+              ${canManage ? `<button class="ghost pinBtn">${s.pinned ? '📌 고정해제' : '📌 고정'}</button>` : ''}
+              ${canManage ? `<button class="ghost hideBtn">${s.hidden ? '👁️ 공개' : '🔒 비공개'}</button>` : ''}
+              ${(canManage && !isMine) ? `<button class="danger banUserBtn">${isAuthorBanned ? '🔓 차단해제' : '🚫 유저 밴'}</button>` : ''}
+              <button class="danger deleteBtn">🗑️ 삭제</button>
+            </div>
+          ` : ''}
 
           <div class="comment-section">
             <div class="comment-list">
@@ -964,20 +985,13 @@ async function renderVisitor(id, keyFromUrl=null){
                   const isMyComment = (c.visitor_id === myVid) || canManage;
                   return `
                     <div class="comment-item" data-cid="${c.id}">
-                      <div>
-                        <span class="c-author">${escapeHtml(c.author)}</span>: <span class="c-content">${escapeHtml(c.content)}</span>
-                        ${c.is_edited ? '<span class="edited-tag">(수정됨)</span>' : ''}
-                        ${isMyComment ? `
-                          <span class="comment-actions">
-                            <button class="editCommentBtn">수정</button>
-                            <button class="delCommentBtn">삭제</button>
-                          </span>
-                        ` : ''}
-                      </div>
-                      ${c.edited_image ? `
-                        <img class="comment-draw-thumb" src="${c.edited_image}" 
-                             onclick="showCompareModal('${s.image}', '${c.edited_image}', '${escapeHtml(s.author||'익명')}', '${escapeHtml(c.author)}')"
-                             title="클릭하여 원본과 비교하기">
+                      <span class="c-author">${escapeHtml(c.author)}</span>: <span class="c-content">${escapeHtml(c.content)}</span>
+                      ${c.is_edited ? '<span class="edited-tag">(수정됨)</span>' : ''}
+                      ${isMyComment ? `
+                        <span class="comment-actions">
+                          <button class="editCommentBtn">수정</button>
+                          <button class="delCommentBtn">삭제</button>
+                        </span>
                       ` : ''}
                     </div>
                   `;
@@ -985,7 +999,7 @@ async function renderVisitor(id, keyFromUrl=null){
               }
             </div>
             <div class="row" style="gap:4px;">
-              <input type="text" placeholder="댓글 입력..." class="commentInput" style="font-size:11px; padding:6px 8px; flex:1;" ${isBanned?'disabled':''}>
+              <input type="text" placeholder="댓글을 입력하세요..." class="commentInput" style="font-size:11px; padding:6px 8px; flex:1;" ${isBanned?'disabled':''}>
               <button class="commentBtn" style="padding:6px 10px; font-size:11px;" ${isBanned?'disabled':''}>등록</button>
             </div>
           </div>
@@ -997,20 +1011,6 @@ async function renderVisitor(id, keyFromUrl=null){
     feed.querySelectorAll('.thumb-card').forEach(card=>{
       const sid = card.dataset.sid;
       const target = subs.find(x=>x.id===sid);
-
-      // 그림 덧그리기/수정하기 버튼 동작
-      const editDrawBtn = card.querySelector('.editDrawBtn');
-      if(editDrawBtn){
-        editDrawBtn.onclick = ()=>{
-          if(isBanned){ alert('차단된 사용자는 작성할 수 없습니다.'); return; }
-          activeEditTargetSub = target;
-          const editCanvas = document.getElementById('editCommentCanvas');
-          setupCanvas(editCanvas, null, target.image);
-          bindBrushControls(document.getElementById('editDrawModal'), null, 'edit_');
-          document.getElementById('editCommentText').value = '';
-          openModal('editDrawModal');
-        };
-      }
 
       card.querySelector('.like-btn').onclick = async ()=>{
         target.likedBy = target.likedBy || [];
@@ -1032,9 +1032,8 @@ async function renderVisitor(id, keyFromUrl=null){
           let bannedList = gallery.banned_visitors || [];
           if(bannedList.includes(targetVid)){
             bannedList = bannedList.filter(v => v !== targetVid);
-            alert(`${target.author || '익명'} 님의 차단이 해제되었습니다.`);
           } else {
-            if(!confirm(`${target.author || '익명'} 님을 차단하시겠습니까? 더 이상 이 갤러리에 업로드할 수 없게 됩니다.`)) return;
+            if(!confirm(`${target.author || '익명'} 님을 차단하시겠습니까?`)) return;
             bannedList.push(targetVid);
           }
           gallery.banned_visitors = bannedList;
@@ -1049,7 +1048,6 @@ async function renderVisitor(id, keyFromUrl=null){
           gallery.cover_image = (gallery.cover_image === target.image) ? '' : target.image;
           const ok = await saveGallery(id, gallery);
           if(ok) refreshFeed();
-          else alert('썸네일 저장 실패!');
         };
       }
 
@@ -1063,18 +1061,14 @@ async function renderVisitor(id, keyFromUrl=null){
       const pinBtn = card.querySelector('.pinBtn');
       if(pinBtn){
         pinBtn.onclick = async ()=>{
-          target.pinned = !target.pinned; 
-          await updateSub(target);
-          refreshFeed();
+          target.pinned = !target.pinned; await updateSub(target); refreshFeed();
         };
       }
 
       const hideBtn = card.querySelector('.hideBtn');
       if(hideBtn){
         hideBtn.onclick = async ()=>{
-          target.hidden = !target.hidden; 
-          await updateSub(target);
-          refreshFeed();
+          target.hidden = !target.hidden; await updateSub(target); refreshFeed();
         };
       }
 
@@ -1101,7 +1095,6 @@ async function renderVisitor(id, keyFromUrl=null){
             if(updated !== null && updated.trim() !== '' && updated !== currentContent){
               const ok = await updateComment(cid, updated.trim());
               if(ok) refreshFeed();
-              else alert('댓글 수정 실패!');
             }
           };
         }
@@ -1112,43 +1105,12 @@ async function renderVisitor(id, keyFromUrl=null){
             if(confirm('이 댓글을 삭제하시겠습니까?')){
               const ok = await deleteComment(cid);
               if(ok) refreshFeed();
-              else alert('댓글 삭제 실패!');
             }
           };
         }
       });
     });
   }
-
-  // 모달 안의 수정본 등록 버튼 처리
-  document.getElementById('saveEditCommentBtn').onclick = async ()=>{
-    if(!activeEditTargetSub) return;
-    const saveBtn = document.getElementById('saveEditCommentBtn');
-    saveBtn.disabled = true;
-
-    const editCanvas = document.getElementById('editCommentCanvas');
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = editCanvas.width;
-    tempCanvas.height = editCanvas.height;
-    const tempCtx = tempCanvas.getContext('2d');
-    tempCtx.fillStyle = '#ffffff';
-    tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-    tempCtx.drawImage(editCanvas, 0, 0);
-
-    const editedImage = tempCanvas.toDataURL('image/png');
-    const text = document.getElementById('editCommentText').value.trim() || '그림을 수정해서 올렸습니다! 🎨';
-    const author = localStorage.getItem('visitor-nickname') || '익명';
-
-    const ok = await addComment(activeEditTargetSub.id, author, text, editedImage);
-    saveBtn.disabled = false;
-
-    if(ok){
-      closeModal('editDrawModal');
-      refreshFeed();
-    } else {
-      alert('등록에 실패했습니다.');
-    }
-  };
 
   refreshFeed();
   pollTimer = setInterval(refreshFeed, 4000);
