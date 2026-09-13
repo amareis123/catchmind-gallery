@@ -30,13 +30,12 @@
   .badge.public { background:#d9f3df; color:var(--good); }
   .badge.banned { background:#ffd1d1; color:var(--bad); }
 
-  /* PC 넓은 작업실 레이아웃 */
+  /* PC 작업실 레이아웃 */
   .editor-wrapper { display: flex; flex-direction: column; gap: 12px; }
   .canvas-area-main { display: flex; flex-direction: column; align-items: center; width: 100%; }
   .canvas-container { position: relative; width: 100%; max-width: 860px; height: 540px; background: #fff; border: 2px solid var(--line); border-radius: 10px; overflow: hidden; margin: 0 auto; }
   .canvas-container canvas { position: absolute; top:0; left:0; width:100%; height:100%; touch-action: none; cursor: crosshair; }
   
-  .tools-layers-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .palette-box, .layer-box { background: #faf8f3; border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
   
   @media (min-width: 992px) {
@@ -47,7 +46,7 @@
     .canvas-container { max-width: 100%; height: 560px; }
   }
 
-  /* 모바일 최적화 스튜디오 스타일 (파렛트 보강) */
+  /* 모바일 스튜디오 스타일 */
   .mobile-studio { display: flex; flex-direction: column; gap: 10px; background: #faf8f3; border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
   .mobile-canvas-container { position: relative; width: 100%; height: 320px; background: #fff; border: 2px solid var(--line); border-radius: 8px; overflow: hidden; margin: 0 auto; }
   .mobile-canvas-container canvas { position: absolute; top:0; left:0; width:100%; height:100%; touch-action: none; cursor: crosshair; }
@@ -766,7 +765,6 @@ function brushControlsHtml(){
     </div>`;
 }
 
-// 모바일 전용 디테일 파렛트 컨트롤 (수정됨)
 function mobileBrushControlsHtml(){
   const colors = ['#26251f','#d9534f','#f582ae','#f0ad4e','#3aa655','#3a8fd9','#8b5aa8','#ffffff'];
   return `
@@ -921,17 +919,20 @@ async function renderVisitor(id, keyFromUrl=null){
     <div class="card" id="studioArea">
       <div class="row" style="justify-content:space-between; margin-bottom:8px;">
         <h2 id="studioTitle">✏️ 새 낙서 그리기 ${isMobile ? '<span class="badge public">모바일 모드</span>' : ''}</h2>
-        <input type="text" id="authorName" placeholder="내 닉네임 (선택)" value="${escapeHtml(savedName)}" style="max-width:180px;" ${isBanned?'disabled':''}>
+        <div class="row">
+          <input type="text" id="authorName" placeholder="내 닉네임 (선택)" value="${escapeHtml(savedName)}" style="max-width:140px;" ${isBanned?'disabled':''}>
+          <input type="text" id="remixCommentInput" placeholder="댓글 텍스트 (선택)" style="max-width:180px;" ${isBanned?'disabled':''}>
+        </div>
       </div>
 
       <!-- 리믹스 타겟 안내 배너 -->
       <div id="remixBanner" style="display:none; background:#fff0f5; border:1px solid var(--accent); padding:8px 12px; border-radius:8px; margin-bottom:10px; font-size:13px; align-items:center; justify-content:space-between;">
-        <span>✨ <b id="remixTargetName"></b> 님의 그림을 수정하여 댓글로 리믹스 등록합니다!</span>
+        <span>✨ <b id="remixTargetName"></b> 님의 그림을 수정하여 댓글로 등록합니다!</span>
         <button class="ghost" id="cancelRemixGlobalBtn" style="font-size:11px; padding:2px 6px;">취소하기</button>
       </div>
 
       ${isMobile ? `
-        <!-- 모바일 전용 UI (디테일 파렛트 포함) -->
+        <!-- 모바일 전용 UI -->
         <div class="mobile-studio">
           <div class="mobile-canvas-container" id="mobileCanvasContainer"></div>
           ${mobileBrushControlsHtml()}
@@ -1001,6 +1002,8 @@ async function renderVisitor(id, keyFromUrl=null){
       document.getElementById('remixBanner').style.display = 'none';
       document.getElementById('studioTitle').innerHTML = `✏️ 새 낙서 그리기 ${isMobile ? '<span class="badge public">모바일 모드</span>' : ''}`;
       document.getElementById('submitBtn').innerText = '새 작품 등록하기';
+      const rInput = document.getElementById('remixCommentInput');
+      if(rInput) rInput.value = '';
       setupMultiLayerStudio(id);
     };
   }
@@ -1061,15 +1064,20 @@ async function renderVisitor(id, keyFromUrl=null){
     localStorage.setItem('visitor-nickname', author);
 
     if(activeRemixTarget){
-      const ok = await addComment(activeRemixTarget.subId, author, '난 이렇게 고쳤다 ㅋㅋ', image);
+      // 사용자가 직접 입력한 텍스트 (없으면 빈 문자열)
+      const remixComment = (document.getElementById('remixCommentInput')?.value || '').trim();
+      
+      const ok = await addComment(activeRemixTarget.subId, author, remixComment, image);
       submitBtn.disabled = false;
 
       if(ok){
-        msg.textContent = '원작 그림의 댓글에 리믹스 등록 완료! 🎉'; msg.className='msg ok';
+        msg.textContent = '수정 그림 등록 완료! 🎉'; msg.className='msg ok';
         activeRemixTarget = null;
         document.getElementById('remixBanner').style.display = 'none';
         document.getElementById('studioTitle').innerHTML = `✏️ 새 낙서 그리기 ${isMobile ? '<span class="badge public">모바일 모드</span>' : ''}`;
         submitBtn.innerText = '새 작품 등록하기';
+        const rInput = document.getElementById('remixCommentInput');
+        if(rInput) rInput.value = '';
         clearUndoHistory();
         setupMultiLayerStudio(id);
         refreshFeed();
@@ -1163,8 +1171,8 @@ async function renderVisitor(id, keyFromUrl=null){
                   const isMyComment = (c.visitor_id === myVid) || canManage;
                   return `
                     <div class="comment-item" data-cid="${c.id}">
-                      <span class="c-author"><b>${escapeHtml(c.author)}</b></span>: <span class="c-content">${escapeHtml(c.content)}</span>
-                      ${c.image ? `<img src="${c.image}" onclick="openModal('${c.image}', '${escapeHtml(c.author)}님의 수정 리믹스')">` : ''}
+                      <span class="c-author"><b>${escapeHtml(c.author)}</b></span>${c.content ? `: <span class="c-content">${escapeHtml(c.content)}</span>` : ''}
+                      ${c.image ? `<img src="${c.image}" onclick="openModal('${c.image}', '${escapeHtml(c.author)}님의 수정 그림')">` : ''}
                       ${c.is_edited ? '<span class="edited-tag">(수정됨)</span>' : ''}
                       ${isMyComment ? `
                         <div style="margin-top:2px; display:flex; gap:4px; justify-content:flex-end;">
@@ -1179,7 +1187,7 @@ async function renderVisitor(id, keyFromUrl=null){
             </div>
             
             <div class="row" style="gap:4px;">
-              <input type="text" placeholder="댓글이나 소감 입력..." class="commentInput" style="font-size:11px; padding:6px 8px; flex:1;" ${isBanned?'disabled':''}>
+              <input type="text" placeholder="댓글 입력..." class="commentInput" style="font-size:11px; padding:6px 8px; flex:1;" ${isBanned?'disabled':''}>
               <button class="commentBtn" style="padding:6px 10px; font-size:11px;" ${isBanned?'disabled':''}>등록</button>
             </div>
           </div>
@@ -1201,7 +1209,7 @@ async function renderVisitor(id, keyFromUrl=null){
           document.getElementById('remixTargetName').innerText = target.author || '익명';
           document.getElementById('remixBanner').style.display = 'flex';
           document.getElementById('studioTitle').innerHTML = `✨ <b>[리믹스 모드]</b> ${escapeHtml(target.author || '익명')}님의 그림 수정 중`;
-          document.getElementById('submitBtn').innerText = '원작 그림의 댓글에 리믹스 등록하기';
+          document.getElementById('submitBtn').innerText = '수정된 그림을 댓글로 등록하기';
 
           document.getElementById('studioArea').scrollIntoView({ behavior: 'smooth' });
         };
@@ -1286,9 +1294,10 @@ async function renderVisitor(id, keyFromUrl=null){
         const editBtn = cItem.querySelector('.editCommentBtn');
         if(editBtn){
           editBtn.onclick = async ()=>{
-            const currentContent = cItem.querySelector('.c-content').innerText;
-            const updated = prompt('댓글을 수정하세요:', currentContent);
-            if(updated !== null && updated.trim() !== '' && updated !== currentContent){
+            const contentEl = cItem.querySelector('.c-content');
+            const currentContent = contentEl ? contentEl.innerText : '';
+            const updated = prompt('댓글 텍스트를 수정하세요:', currentContent);
+            if(updated !== null && updated !== currentContent){
               const ok = await updateComment(cid, updated.trim());
               if(ok) refreshFeed();
             }
