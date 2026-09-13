@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>낙서 갤러리 Pro</title>
 <style>
   :root{
@@ -42,6 +42,14 @@
     .canvas-container { max-width: 100%; height: 500px; }
   }
 
+  /* 모바일 최적화 스튜디오 스타일 */
+  .mobile-studio { display: flex; flex-direction: column; gap: 10px; background: #faf8f3; border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+  .mobile-canvas-container { position: relative; width: 100%; height: 320px; background: #fff; border: 2px solid var(--line); border-radius: 8px; overflow: hidden; margin: 0 auto; }
+  .mobile-canvas-container canvas { position: absolute; top:0; left:0; width:100%; height:100%; touch-action: none; cursor: crosshair; }
+  .mobile-tools-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .mobile-swatch { height: 26px; border-radius: 4px; border: 1px solid #fff; box-shadow: 0 0 0 1px var(--line); cursor: pointer; }
+  .mobile-swatch.active { box-shadow: 0 0 0 2px var(--ink); transform: scale(1.05); }
+
   /* 색상 & 툴 컨트롤 */
   .swatch-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 8px 0; }
   .swatch { height: 28px; border-radius: 6px; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--line); cursor: pointer; }
@@ -61,6 +69,9 @@
   .gallery-card .cover { width:100%; height:140px; border-radius:8px; background:#f6f3ea; object-fit:cover; display:flex; align-items:center; justify-content:center; color:#888; font-size:12px; }
 
   .thumb-card { width: 220px; background:#fbfaf5; border:1px solid var(--line); border-radius:10px; padding:10px; font-size:12px; position:relative; }
+  @media (max-width: 768px) {
+    .thumb-card { width: 100%; }
+  }
   .thumb-card.pinned-card { border: 2px solid var(--accent); background:#fff0f5; }
   .thumb-card.hidden-card { opacity: 0.65; border: 1px dashed #888; }
   .thumb-card img { width:100%; border-radius:6px; display:block; margin-bottom:6px; background:#fff; cursor:pointer; }
@@ -72,8 +83,9 @@
   .admin-actions button { font-size:10px; padding:3px 6px; border-radius:6px; }
   
   .comment-section { margin-top:8px; border-top:1px dashed var(--line); padding-top:8px; }
-  .comment-list { max-height:140px; overflow-y:auto; margin-bottom:8px; display:flex; flex-direction:column; gap:4px; }
+  .comment-list { max-height:180px; overflow-y:auto; margin-bottom:8px; display:flex; flex-direction:column; gap:6px; }
   .comment-item { background:#fff; padding:6px 8px; border-radius:6px; font-size:11px; border:1px solid #f0ebd9; word-break:break-all; position:relative; }
+  .comment-item img { max-width: 100%; border-radius: 4px; margin-top: 4px; display: block; cursor: pointer; }
 
   .tool-btn { padding:6px 10px; font-size:12px; background:#eee; color:#333; flex: 1; }
   .tool-btn.active { background:var(--ink); color:#fff; }
@@ -126,6 +138,11 @@ let undoStack = [];
 let redoStack = [];
 const MAX_UNDO = 30;
 let currentActiveGalleryId = null;
+
+// 모바일 기기 여부 판별
+function isMobileDevice() {
+  return window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
 
 function escapeHtml(s){ const d = document.createElement('div'); d.innerText = s == null ? '' : String(s); return d.innerHTML; }
 function genId(len){
@@ -234,11 +251,11 @@ async function loadComments(subId){
   } catch(e){ return []; }
 }
 
-async function addComment(subId, author, content){
+async function addComment(subId, author, content, imageBase64 = null){
   try {
     const vId = await getVisitorId();
     const { error } = await supabaseClient.from('comments').insert({
-      id: genId(10), submission_id: subId, author: author || '익명', content: content, visitor_id: vId, is_edited: false
+      id: genId(10), submission_id: subId, author: author || '익명', content: content, image: imageBase64, visitor_id: vId, is_edited: false
     });
     return !error;
   } catch(e){ return false; }
@@ -388,7 +405,7 @@ async function renderHome(){
     galleryDataList.sort((a,b)=>{
       if(gallerySort === 'popular') return b.totalLikes - a.totalLikes;
       if(gallerySort === 'newest') return new Date(b.gallery.created_at) - new Date(a.gallery.created_at);
-      if(gallerySort === 'oldest') return new Date(a.gallery.created_at) - new Date(b.gallery.created_at);
+      if(gallerySort === 'oldest') return new Date(b.gallery.created_at) - new Date(a.gallery.created_at);
     });
 
     let html = '';
@@ -452,7 +469,8 @@ function redo(){
 }
 
 function restoreState(state){
-  const container = document.getElementById('canvasContainer');
+  const containerId = isMobileDevice() ? 'mobileCanvasContainer' : 'canvasContainer';
+  const container = document.getElementById(containerId);
   if(!container) return;
   container.innerHTML = '';
   layers = [];
@@ -479,7 +497,8 @@ function clearUndoHistory(){
 
 function addLayer(name, initialImageSrc=null){
   if(layers.length >= 10){ alert('레이어는 최대 10개까지 추가 가능합니다.'); return; }
-  const container = document.getElementById('canvasContainer');
+  const containerId = isMobileDevice() ? 'mobileCanvasContainer' : 'canvasContainer';
+  const container = document.getElementById(containerId);
   const canvas = document.createElement('canvas');
   canvas.width = 600; canvas.height = 450;
   
@@ -524,7 +543,8 @@ function moveLayer(index, dir){
   layers[index] = layers[newIndex];
   layers[newIndex] = temp;
 
-  const container = document.getElementById('canvasContainer');
+  const containerId = isMobileDevice() ? 'mobileCanvasContainer' : 'canvasContainer';
+  const container = document.getElementById(containerId);
   container.innerHTML = '';
   layers.forEach(l => container.appendChild(l.canvas));
 
@@ -616,13 +636,15 @@ function floodFill(canvas, startX, startY, fillColorRgba){
 
 function setupMultiLayerStudio(galleryId, initialBgImage = null){
   currentActiveGalleryId = galleryId;
-  const container = document.getElementById('canvasContainer');
+  const containerId = isMobileDevice() ? 'mobileCanvasContainer' : 'canvasContainer';
+  const container = document.getElementById(containerId);
+  if(!container) return;
+  
   container.innerHTML = '';
   layers = [];
   layerIdCounter = 0;
   clearUndoHistory();
 
-  // 최초 레이어 생성 (가져온 그림이 있으면 배경으로 주입)
   addLayer('배경 레이어', initialBgImage);
   
   let last = null;
@@ -711,13 +733,31 @@ function brushControlsHtml(){
     </div>`;
 }
 
+function mobileBrushControlsHtml(){
+  const colors = ['#26251f','#d9534f','#f582ae','#3aa655','#3a8fd9','#ffffff'];
+  return `
+    <div class="row" style="gap:4px; margin-bottom:6px;">
+      <button type="button" class="tool-btn active" id="mobileToolBrush" style="padding:4px; font-size:11px;">🖌️ 붓</button>
+      <button type="button" class="tool-btn" id="mobileToolFill" style="padding:4px; font-size:11px;">🪣 채우기</button>
+      <button class="ghost" id="mobileUndoBtn" type="button" style="padding:4px 8px; font-size:11px;">↩️ 되돌리기</button>
+      <button class="ghost" id="mobileClearBtn" type="button" style="color:var(--bad); padding:4px 8px; font-size:11px;">🗑️ 리셋</button>
+    </div>
+    <div class="mobile-tools-grid">
+      ${colors.map(c=>`<span class="mobile-swatch ${c==='#26251f'?'active':''}" data-color="${c}" style="background:${c};"></span>`).join('')}
+    </div>
+    <div class="row" style="margin-top:6px; gap:8px;">
+      <div style="flex:1;"><span class="small">굵기: <b id="mobileBrushSizeVal">4px</b></span><input type="range" min="1" max="30" value="4" id="mobileBrushSize" style="width:100%;"></div>
+    </div>`;
+}
+
 function bindBrushControls(scope){
-  scope.querySelectorAll('.swatch').forEach(s=>{
+  scope.querySelectorAll('.swatch, .mobile-swatch').forEach(s=>{
     s.onclick = ()=>{ 
       currentBrush.color = s.dataset.color; 
-      scope.querySelectorAll('.swatch').forEach(x=>x.classList.remove('active')); 
+      scope.querySelectorAll('.swatch, .mobile-swatch').forEach(x=>x.classList.remove('active')); 
       s.classList.add('active'); 
-      scope.querySelector('#customColorPicker').value = currentBrush.color.length === 7 ? currentBrush.color : '#26251f';
+      const picker = scope.querySelector('#customColorPicker');
+      if(picker) picker.value = currentBrush.color.length === 7 ? currentBrush.color : '#26251f';
     };
   });
 
@@ -729,31 +769,46 @@ function bindBrushControls(scope){
     };
   }
 
-  const tBrush = scope.querySelector('#toolBrush');
-  const tFill = scope.querySelector('#toolFill');
+  const tBrush = scope.querySelector('#toolBrush, #mobileToolBrush');
+  const tFill = scope.querySelector('#toolFill, #mobileToolFill');
   if(tBrush && tFill){
     tBrush.onclick = ()=>{ currentBrush.tool='brush'; tBrush.classList.add('active'); tFill.classList.remove('active'); };
     tFill.onclick = ()=>{ currentBrush.tool='fill'; tFill.classList.add('active'); tBrush.classList.remove('active'); };
   }
 
-  scope.querySelector('#brushSize').oninput = (e)=>{ 
-    currentBrush.size = parseInt(e.target.value); 
-    scope.querySelector('#brushSizeVal').textContent = `${currentBrush.size}px`;
-  };
+  const sizeInput = scope.querySelector('#brushSize, #mobileBrushSize');
+  const sizeVal = scope.querySelector('#brushSizeVal, #mobileBrushSizeVal');
+  if(sizeInput && sizeVal){
+    sizeInput.oninput = (e)=>{ 
+      currentBrush.size = parseInt(e.target.value); 
+      sizeVal.textContent = `${currentBrush.size}px`;
+    };
+  }
 
-  scope.querySelector('#brushOpacity').oninput = (e)=>{
-    const val = parseInt(e.target.value);
-    currentBrush.opacity = val / 100;
-    scope.querySelector('#brushOpacityVal').textContent = `${val}%`;
-  };
+  const opInput = scope.querySelector('#brushOpacity');
+  const opVal = scope.querySelector('#brushOpacityVal');
+  if(opInput && opVal){
+    opInput.oninput = (e)=>{
+      const val = parseInt(e.target.value);
+      currentBrush.opacity = val / 100;
+      opVal.textContent = `${val}%`;
+    };
+  }
 
-  scope.querySelector('#undoBtn').onclick = () => undo();
-  scope.querySelector('#redoBtn').onclick = () => redo();
-  scope.querySelector('#clearBtn').onclick = ()=>{
-    if(confirm('전체 그리기 영역을 초기화하시겠습니까?')){
-      setupMultiLayerStudio(currentActiveGalleryId);
-    }
-  };
+  const undoBtn = scope.querySelector('#undoBtn, #mobileUndoBtn');
+  if(undoBtn) undoBtn.onclick = () => undo();
+
+  const redoBtn = scope.querySelector('#redoBtn');
+  if(redoBtn) redoBtn.onclick = () => redo();
+
+  const clearBtn = scope.querySelector('#clearBtn, #mobileClearBtn');
+  if(clearBtn){
+    clearBtn.onclick = ()=>{
+      if(confirm('전체 그리기 영역을 초기화하시겠습니까?')){
+        setupMultiLayerStudio(currentActiveGalleryId);
+      }
+    };
+  }
 }
 
 // ---------------- Gallery & Visitor View ----------------
@@ -775,6 +830,7 @@ async function renderVisitor(id, keyFromUrl=null){
   const savedName = localStorage.getItem('visitor-nickname') || '';
   let currentSort = 'popular';
   let showPrivateFilter = false;
+  const isMobile = isMobileDevice();
 
   APP.innerHTML = `
     <div class="topbar">
@@ -804,29 +860,40 @@ async function renderVisitor(id, keyFromUrl=null){
 
     <div class="card" id="studioArea">
       <div class="row" style="justify-content:space-between; margin-bottom:8px;">
-        <h2>✏️ 캔버스에 그림 그리기</h2>
-        <input type="text" id="authorName" placeholder="내 닉네임 (선택)" value="${escapeHtml(savedName)}" style="max-width:200px;" ${isBanned?'disabled':''}>
+        <h2>✏️ 캔버스에 그림 그리기 ${isMobile ? '<span class="badge public">모바일 모드</span>' : ''}</h2>
+        <input type="text" id="authorName" placeholder="내 닉네임 (선택)" value="${escapeHtml(savedName)}" style="max-width:180px;" ${isBanned?'disabled':''}>
       </div>
 
-      <div class="editor-wrapper">
-        <div class="palette-column">
-          ${brushControlsHtml()}
-        </div>
-        
-        <div style="display:flex; flex-direction:column; gap:8px;">
-          <div class="canvas-container" id="canvasContainer"></div>
-          <button id="submitBtn" style="width:100%; padding:12px; font-size:15px;" ${isBanned?'disabled':''}>작품 등록하기</button>
+      ${isMobile ? `
+        <!-- 모바일 전용 컴팩트 UI -->
+        <div class="mobile-studio">
+          <div class="mobile-canvas-container" id="mobileCanvasContainer"></div>
+          ${mobileBrushControlsHtml()}
+          <button id="submitBtn" style="width:100%; padding:10px; font-size:14px; margin-top:4px;" ${isBanned?'disabled':''}>새 작품 등록하기</button>
           <div class="msg" id="submitMsg"></div>
         </div>
-
-        <div class="layer-column">
-          <div class="row" style="justify-content:space-between; margin-bottom:8px;">
-            <span style="font-weight:bold; font-size:13px;">📚 레이어 (최대 10개)</span>
-            <button class="secondary" onclick="addLayer()" style="padding:2px 6px; font-size:11px;">+ 추가</button>
+      ` : `
+        <!-- PC 전용 3컬럼 스튜디오 UI -->
+        <div class="editor-wrapper">
+          <div class="palette-column">
+            ${brushControlsHtml()}
           </div>
-          <div class="layer-list" id="layerList"></div>
+          
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <div class="canvas-container" id="canvasContainer"></div>
+            <button id="submitBtn" style="width:100%; padding:12px; font-size:15px;" ${isBanned?'disabled':''}>새 작품 등록하기</button>
+            <div class="msg" id="submitMsg"></div>
+          </div>
+
+          <div class="layer-column">
+            <div class="row" style="justify-content:space-between; margin-bottom:8px;">
+              <span style="font-weight:bold; font-size:13px;">📚 레이어 (최대 10개)</span>
+              <button class="secondary" onclick="addLayer()" style="padding:2px 6px; font-size:11px;">+ 추가</button>
+            </div>
+            <div class="layer-list" id="layerList"></div>
+          </div>
         </div>
-      </div>
+      `}
     </div>
 
     <div class="row" style="justify-content:space-between; margin:16px 0 8px;">
@@ -981,7 +1048,7 @@ async function renderVisitor(id, keyFromUrl=null){
             ${isLiked ? '💖 좋아요 완료' : '🤍 좋아요'} (${s.likes||0})
           </button>
           
-          <button class="secondary remixBtn" style="width:100%; margin-top:4px; font-size:11px;">🖌️ 그림 가져와서 수정</button>
+          <button class="secondary remixBtn" style="width:100%; margin-top:4px; font-size:11px;">🖌️ 그림 가져와서 수정 (리믹스)</button>
 
           ${(canManage || isMine) ? `
             <div class="admin-actions">
@@ -995,26 +1062,33 @@ async function renderVisitor(id, keyFromUrl=null){
 
           <div class="comment-section">
             <div class="comment-list">
-              ${comments.length === 0 ? '<div class="small" style="color:#aaa;">댓글이 없습니다.</div>' : 
+              ${comments.length === 0 ? '<div class="small" style="color:#aaa;">아직 댓글이 없습니다.</div>' : 
                 comments.map(c=>{
                   const isMyComment = (c.visitor_id === myVid) || canManage;
                   return `
                     <div class="comment-item" data-cid="${c.id}">
-                      <span class="c-author">${escapeHtml(c.author)}</span>: <span class="c-content">${escapeHtml(c.content)}</span>
+                      <span class="c-author"><b>${escapeHtml(c.author)}</b></span>: <span class="c-content">${escapeHtml(c.content)}</span>
+                      ${c.image ? `<img src="${c.image}" onclick="openModal('${c.image}', '${escapeHtml(c.author)}님의 수정 리믹스')">` : ''}
                       ${c.is_edited ? '<span class="edited-tag">(수정됨)</span>' : ''}
                       ${isMyComment ? `
-                        <span class="comment-actions">
-                          <button class="editCommentBtn">수정</button>
-                          <button class="delCommentBtn">삭제</button>
-                        </span>
+                        <div style="margin-top:2px; display:flex; gap:4px; justify-content:flex-end;">
+                          <button class="ghost editCommentBtn" style="font-size:9px; padding:1px 4px;">수정</button>
+                          <button class="danger delCommentBtn" style="font-size:9px; padding:1px 4px;">삭제</button>
+                        </div>
                       ` : ''}
                     </div>
                   `;
                 }).join('')
               }
             </div>
+            
+            <!-- 리믹스 모드 안내 및 전송 영역 -->
+            <div class="remix-indicator-box" style="display:none; background:#fff5f8; border:1px dashed var(--accent); padding:6px; border-radius:6px; margin-bottom:6px; font-size:11px;">
+              ✨ <b>[리믹스 답변 모드 활성화]</b> 내 수정 그림이 이 댓글에 등록됩니다! <button class="ghost" id="cancelRemixBtn" style="font-size:10px; padding:1px 4px; float:right;">취소</button>
+            </div>
+
             <div class="row" style="gap:4px;">
-              <input type="text" placeholder="댓글을 입력하세요..." class="commentInput" style="font-size:11px; padding:6px 8px; flex:1;" ${isBanned?'disabled':''}>
+              <input type="text" placeholder="댓글이나 소감 입력..." class="commentInput" style="font-size:11px; padding:6px 8px; flex:1;" ${isBanned?'disabled':''}>
               <button class="commentBtn" style="padding:6px 10px; font-size:11px;" ${isBanned?'disabled':''}>등록</button>
             </div>
           </div>
@@ -1026,14 +1100,28 @@ async function renderVisitor(id, keyFromUrl=null){
     feed.querySelectorAll('.thumb-card').forEach(card=>{
       const sid = card.dataset.sid;
       const target = subs.find(x=>x.id===sid);
+      let isRemixTarget = false;
 
       const remixBtn = card.querySelector('.remixBtn');
+      const remixBox = card.querySelector('.remix-indicator-box');
+      const cancelRemixBtn = card.querySelector('#cancelRemixBtn');
+
       if(remixBtn){
         remixBtn.onclick = ()=>{
-          if(confirm(`${target.author || '익명'} 님의 그림을 캔버스로 불러와서 수정하시겠습니까?`)){
-            setupMultiLayerStudio(id, target.image);
-            document.getElementById('studioArea').scrollIntoView({ behavior: 'smooth' });
-          }
+          // 기존 다른 카드의 리믹스 박스 초기화
+          feed.querySelectorAll('.remix-indicator-box').forEach(b => b.style.display = 'none');
+          
+          setupMultiLayerStudio(id, target.image);
+          remixBox.style.display = 'block';
+          isRemixTarget = true;
+          document.getElementById('studioArea').scrollIntoView({ behavior: 'smooth' });
+        };
+      }
+
+      if(cancelRemixBtn){
+        cancelRemixBtn.onclick = () => {
+          remixBox.style.display = 'none';
+          isRemixTarget = false;
         };
       }
 
@@ -1102,10 +1190,34 @@ async function renderVisitor(id, keyFromUrl=null){
         commentBtn.onclick = async ()=>{
           const input = card.querySelector('.commentInput');
           const val = input.value.trim();
-          if(!val) return;
           const author = localStorage.getItem('visitor-nickname') || '익명';
-          await addComment(sid, author, val);
+
+          let commentImage = null;
+          // 만약 이 카드가 리믹스 대상이고 캔버스에 수정 작업이 들어갔다면 이미지로 묶어서 댓글로 전송
+          if(isRemixTarget){
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = 600; tempCanvas.height = 450;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.fillStyle = '#ffffff';
+            tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+            layers.forEach(l => {
+              if(l.visible){
+                tempCtx.globalAlpha = l.opacity;
+                tempCtx.drawImage(l.canvas, 0, 0);
+              }
+            });
+            commentImage = tempCanvas.toDataURL('image/png');
+          }
+
+          if(!val && !commentImage) return;
+
+          await addComment(sid, author, val || '이렇게 수정해봤어 ㅋㅋ', commentImage);
           input.value = '';
+          
+          // 리믹스 상태 초기화
+          isRemixTarget = false;
+          remixBox.style.display = 'none';
+          setupMultiLayerStudio(id); // 캔버스 초기화
           refreshFeed();
         };
       }
