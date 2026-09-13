@@ -23,18 +23,17 @@
   button:disabled { opacity: 0.5; cursor: not-allowed; }
   input[type=text], input[type=password], select { font-family: inherit; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line); font-size: 14px; }
   .row { display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
-  .link-box { display:flex; gap:6px; margin-top:4px; }
-  .link-box input { flex:1; background:#f6f3ea; }
   canvas { border-radius: 10px; border: 2px solid var(--line); background:#fff; touch-action: none; width:100%; max-width:480px; height:auto; display:block; cursor: crosshair; }
+  
   .swatch { width:24px; height:24px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1px var(--line); cursor:pointer; display:inline-block; }
   .swatch.active { box-shadow: 0 0 0 2px var(--ink); transform: scale(1.1); }
+  
   .badge { display:inline-block; font-size:11px; padding:2px 8px; border-radius:20px; font-weight:700; }
   .badge.pinned { background:#ffe3ec; color:var(--accent); }
   .badge.hidden { background:#e2e2e2; color:#666; }
-  .badge.private { background:#eee; color:#666; }
   .badge.public { background:#d9f3df; color:var(--good); }
-  .grid { display:flex; flex-wrap:wrap; gap:12px; }
   
+  .grid { display:flex; flex-wrap:wrap; gap:12px; }
   .gallery-card { width: 220px; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; cursor:pointer; transition:transform 0.1s; }
   .gallery-card:hover { transform:translateY(-2px); }
   .gallery-card .cover { width:100%; height:140px; border-radius:8px; background:#f6f3ea; object-fit:cover; display:flex; align-items:center; justify-content:center; color:#888; font-size:12px; }
@@ -43,14 +42,12 @@
   .thumb-card.pinned-card { border: 2px solid var(--accent); background:#fff0f5; }
   .thumb-card img { width:100%; border-radius:6px; display:block; margin-bottom:6px; background:#fff; cursor:pointer; }
   
-  /* 좋아요 버튼 스타일 보완 */
   .like-btn { background:#fff; color:#666; border:1px solid var(--line); font-size:12px; padding:6px 10px; margin-top:4px; border-radius:6px; width:100%; font-weight:600; }
   .like-btn.liked { background:#ffe3ec; color:var(--accent); border-color:var(--accent); }
 
   .admin-actions { display:flex; gap:4px; margin-top:6px; flex-wrap:wrap; }
-  .admin-actions button { font-size:10px; padding:4px 6px; border-radius:6px; }
+  .admin-actions button { font-size:10px; padding:3px 6px; border-radius:6px; }
   
-  /* 댓글 영역 보완 */
   .comment-section { margin-top:8px; border-top:1px dashed var(--line); padding-top:8px; }
   .comment-list { max-height:120px; overflow-y:auto; margin-bottom:8px; display:flex; flex-direction:column; gap:4px; }
   .comment-item { background:#fff; padding:6px 8px; border-radius:6px; font-size:11px; border:1px solid #f0ebd9; word-break:break-all; }
@@ -88,7 +85,7 @@
 <script>
 const SUPABASE_URL = "https://usxaesuezcagnjrhngqt.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzeGFlc3VlemNhZ25qcmhuZ3F0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyMTQ3NTgsImV4cCI6MjEwNDc5MDc1OH0.RSY-kBFmTDx72VkjuwlaT9_5sF1szG6OV2QoluFUdR0";
-const MASTER_ADMIN_PW = "admin1234"; // 마스터 관리자 비밀번호
+const MASTER_ADMIN_PW = "admin1234";
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const APP = document.getElementById('app');
@@ -99,7 +96,7 @@ let visitorId = null;
 
 let undoStack = [];
 let redoStack = [];
-const MAX_UNDO = 15;
+const MAX_UNDO = 10;
 
 function escapeHtml(s){ const d = document.createElement('div'); d.innerText = s == null ? '' : String(s); return d.innerHTML; }
 function genId(len){
@@ -123,7 +120,7 @@ async function getVisitorId(){
   return visitorId;
 }
 
-function isAdminLoggedIn(){
+function isMasterAdmin(){
   return localStorage.getItem('is-master-admin') === 'true';
 }
 
@@ -140,7 +137,7 @@ async function saveGallery(id, obj){
   try {
     const { data, error } = await supabaseClient.from('gallery').upsert({
       id: id,
-      owner_key: obj.owner_key || 'master',
+      owner_key: obj.owner_key || genId(16),
       title: obj.title || '나만의 갤러리',
       is_public: obj.is_public !== undefined ? obj.is_public : true,
       cover_image: obj.cover_image || '',
@@ -228,6 +225,10 @@ async function addComment(subId, author, content){
 function route(){
   if(pollTimer){ clearInterval(pollTimer); pollTimer = null; }
   const hash = location.hash.replace('#','');
+  if(hash.startsWith('owner=')){
+    const parts = hash.slice(6).split('&key=');
+    return renderVisitor(parts[0], parts[1]);
+  }
   if(hash.startsWith('visit=')) return renderVisitor(hash.slice(6));
   return renderHome();
 }
@@ -235,11 +236,11 @@ addEventListener('hashchange', route);
 
 // ---------------- Home ----------------
 async function renderHome(){
-  const adminState = isAdminLoggedIn();
+  const adminState = isMasterAdmin();
   APP.innerHTML = `
     <div class="topbar">
       <h1>🎨 낙서 갤러리 Pro</h1>
-      <button class="ghost" id="adminLoginToggle">${adminState ? '🔓 관리자 로그아웃' : '🔑 관리자 로그인'}</button>
+      <button class="ghost" id="adminLoginToggle">${adminState ? '🔓 마스터 로그아웃' : '🔑 마스터 로그인'}</button>
     </div>
     <p class="sub">나만의 갤러리를 개설하거나 공개된 갤러리의 그림들을 감상해보세요.</p>
     
@@ -266,15 +267,15 @@ async function renderHome(){
   `;
 
   document.getElementById('adminLoginToggle').onclick = ()=>{
-    if(isAdminLoggedIn()){
+    if(isMasterAdmin()){
       localStorage.removeItem('is-master-admin');
-      alert('관리자 로그아웃 되었습니다.');
+      alert('마스터 관리자 로그아웃 되었습니다.');
       renderHome();
     } else {
-      const pw = prompt('관리자 비밀번호를 입력하세요:');
+      const pw = prompt('마스터 관리자 비밀번호를 입력하세요:');
       if(pw === MASTER_ADMIN_PW){
         localStorage.setItem('is-master-admin', 'true');
-        alert('관리자로 로그인되었습니다!');
+        alert('마스터 관리자로 로그인되었습니다!');
         renderHome();
       } else if(pw !== null) {
         alert('비밀번호가 올바르지 않습니다.');
@@ -288,10 +289,16 @@ async function renderHome(){
     const title = document.getElementById('newTitle').value.trim() || '나만의 갤러리';
     const isPublic = document.getElementById('newPublic').value === 'true';
     const id = genId(8);
+    const ownerKey = genId(16);
     
-    const ok = await saveGallery(id, { title, is_public: isPublic });
-    if(ok){ location.hash = `visit=${id}`; } 
-    else { alert('생성 실패! DB 연결 권한을 확인해 주세요.'); btn.disabled = false; btn.innerText = '✏️ 갤러리 생성'; }
+    const ok = await saveGallery(id, { owner_key: ownerKey, title, is_public: isPublic });
+    if(ok){ 
+      localStorage.setItem(`owner_key_${id}`, ownerKey);
+      location.hash = `owner=${id}&key=${ownerKey}`; 
+    } else { 
+      alert('생성 실패! DB 연결 권한을 확인해 주세요.'); 
+      btn.disabled = false; btn.innerText = '✏️ 갤러리 생성'; 
+    }
   };
 
   async function loadGalleries(q=''){
@@ -319,7 +326,7 @@ async function renderHome(){
   loadGalleries();
 }
 
-// ---------------- Canvas Helpers ----------------
+// ---------------- Canvas & Performance Optimization ----------------
 function getRgbaColor(hex, opacity){
   let c = hex.replace('#','');
   if(c.length === 3) c = c.split('').map(x=>x+x).join('');
@@ -332,16 +339,80 @@ function saveState(canvas, galleryId){
   if(undoStack.length >= MAX_UNDO) undoStack.shift();
   undoStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
   redoStack = [];
-  if(galleryId) localStorage.setItem(`draft-canvas-${galleryId}`, canvas.toDataURL());
+  
+  // 자동 임시저장 (LocalStorage)
+  if(galleryId) {
+    try {
+      localStorage.setItem(`draft-canvas-${galleryId}`, canvas.toDataURL('image/png'));
+    } catch(e){}
+  }
+}
+
+function undo(canvas, galleryId){
+  if(undoStack.length <= 1) return;
+  const ctx = canvas.getContext('2d');
+  redoStack.push(undoStack.pop());
+  const prevState = undoStack[undoStack.length - 1];
+  ctx.putImageData(prevState, 0, 0);
+  if(galleryId) localStorage.setItem(`draft-canvas-${galleryId}`, canvas.toDataURL('image/png'));
+}
+
+function redo(canvas, galleryId){
+  if(redoStack.length === 0) return;
+  const ctx = canvas.getContext('2d');
+  const nextState = redoStack.pop();
+  undoStack.push(nextState);
+  ctx.putImageData(nextState, 0, 0);
+  if(galleryId) localStorage.setItem(`draft-canvas-${galleryId}`, canvas.toDataURL('image/png'));
+}
+
+function floodFill(canvas, startX, startY, fillColorRgba){
+  const ctx = canvas.getContext('2d');
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imgData.data;
+  
+  const temp = document.createElement('div');
+  temp.style.color = fillColorRgba;
+  document.body.appendChild(temp);
+  const cs = window.getComputedStyle(temp).color.match(/[\d.]+/g).map(Number);
+  document.body.removeChild(temp);
+  
+  const fillR = cs[0], fillG = cs[1], fillB = cs[2], fillA = Math.round((cs[3] !== undefined ? cs[3] : 1) * 255);
+  const targetIdx = (Math.floor(startY) * canvas.width + Math.floor(startX)) * 4;
+  const startR = data[targetIdx], startG = data[targetIdx+1], startB = data[targetIdx+2], startA = data[targetIdx+3];
+
+  if(Math.abs(startR - fillR) < 5 && Math.abs(startG - fillG) < 5 && Math.abs(startB - fillB) < 5 && Math.abs(startA - fillA) < 5) return;
+
+  function matchColor(idx){
+    return Math.abs(data[idx] - startR) < 32 && Math.abs(data[idx+1] - startG) < 32 &&
+           Math.abs(data[idx+2] - startB) < 32 && Math.abs(data[idx+3] - startA) < 32;
+  }
+
+  const queue = [[Math.floor(startX), Math.floor(startY)]];
+  const width = canvas.width, height = canvas.height;
+
+  while(queue.length > 0){
+    const [x, y] = queue.pop();
+    const idx = (y * width + x) * 4;
+    if(matchColor(idx)){
+      data[idx] = fillR; data[idx+1] = fillG; data[idx+2] = fillB; data[idx+3] = fillA;
+      if(x > 0) queue.push([x - 1, y]);
+      if(x < width - 1) queue.push([x + 1, y]);
+      if(y > 0) queue.push([x, y - 1]);
+      if(y < height - 1) queue.push([x, y + 1]);
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
 }
 
 function setupCanvas(canvas, galleryId){
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   canvas.width = 480; canvas.height = 360;
   ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height);
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   undoStack = []; redoStack = [];
 
+  // 자동 임시저장 불러오기 (자동 복원)
   const savedDraft = localStorage.getItem(`draft-canvas-${galleryId}`);
   if(savedDraft){
     const img = new Image();
@@ -350,21 +421,48 @@ function setupCanvas(canvas, galleryId){
   } else { saveState(canvas, galleryId); }
 
   let last = null;
+  let isFramePending = false;
+
   function pos(e){
     const rect = canvas.getBoundingClientRect();
-    return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) };
+    return { 
+      x: (e.clientX - rect.left) * (canvas.width / rect.width), 
+      y: (e.clientY - rect.top) * (canvas.height / rect.height)
+    };
   }
+
   function start(e){
-    e.preventDefault(); drawing = true; last = pos(e);
-  }
-  function move(e){
-    if(!drawing) return; e.preventDefault();
+    e.preventDefault();
     const p = pos(e);
-    ctx.strokeStyle = getRgbaColor(currentBrush.color, currentBrush.opacity);
-    ctx.lineWidth = currentBrush.size;
-    ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
-    last = p;
+    const activeColor = getRgbaColor(currentBrush.color, currentBrush.opacity);
+
+    if(currentBrush.tool === 'fill'){
+      floodFill(canvas, p.x, p.y, activeColor);
+      saveState(canvas, galleryId);
+      return;
+    }
+    drawing = true; last = p;
   }
+
+  function move(e){
+    if(!drawing || currentBrush.tool === 'fill') return; 
+    e.preventDefault();
+    const p = pos(e);
+
+    if(!isFramePending){
+      isFramePending = true;
+      requestAnimationFrame(()=>{
+        ctx.strokeStyle = getRgbaColor(currentBrush.color, currentBrush.opacity);
+        let calculatedWidth = currentBrush.size;
+        if (e.pointerType === 'pen' && e.pressure > 0) calculatedWidth = currentBrush.size * (e.pressure * 2); 
+        ctx.lineWidth = Math.max(0.5, calculatedWidth);
+
+        ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+        last = p; isFramePending = false;
+      });
+    }
+  }
+
   function end(){ if(drawing){ drawing = false; saveState(canvas, galleryId); } }
 
   canvas.addEventListener('pointerdown', start);
@@ -373,16 +471,29 @@ function setupCanvas(canvas, galleryId){
   return ctx;
 }
 
+// ---------------- Palette UI Component ----------------
 function brushControlsHtml(){
-  const colors = ['#26251f','#d9534f','#f582ae','#f0ad4e','#3aa655','#3a8fd9','#ffffff'];
+  const colors = ['#26251f','#d9534f','#f582ae','#f0ad4e','#3aa655','#3a8fd9','#8b5aa8','#ffffff'];
   return `
     <div class="row" style="margin-top:10px; gap:6px;">
-      ${colors.map(c=>`<span class="swatch" data-color="${c}" style="background:${c}; ${c==='#ffffff'?'box-shadow:0 0 0 1px #ccc;':''}"></span>`).join('')}
+      <button type="button" class="tool-btn active" id="toolBrush">🖌️ 붓</button>
+      <button type="button" class="tool-btn" id="toolFill">🪣 채우기</button>
+      <div style="border-left:1px solid #ccc; height:20px; margin:0 4px;"></div>
+      ${colors.map(c=>`<span class="swatch ${c==='#26251f'?'active':''}" data-color="${c}" style="background:${c}; ${c==='#ffffff'?'box-shadow:0 0 0 1px #ccc;':''}"></span>`).join('')}
     </div>
     <div class="row" style="margin-top:8px;">
       <span class="small">굵기:</span>
-      <input type="range" min="1" max="50" value="4" id="brushSize" style="width:100px;">
-      <button class="ghost" id="clearBtn" type="button" style="padding:4px 10px; font-size:12px; color:var(--bad); margin-left:auto;">🗑️ 초기화</button>
+      <input type="range" min="1" max="50" value="4" id="brushSize" style="width:70px;">
+      <span class="small" id="brushSizeVal">4px</span>
+      <div style="border-left:1px solid #ccc; height:16px; margin:0 4px;"></div>
+      <span class="small">투명도:</span>
+      <input type="range" min="5" max="100" value="100" id="brushOpacity" style="width:70px;">
+      <span class="small" id="brushOpacityVal">100%</span>
+    </div>
+    <div class="row" style="margin-top:8px;">
+      <button class="ghost" id="undoBtn" type="button" style="padding:4px 10px; font-size:12px;">↩️ 뒤로</button>
+      <button class="ghost" id="redoBtn" type="button" style="padding:4px 10px; font-size:12px;">↪️ 다시</button>
+      <button class="ghost" id="clearBtn" type="button" style="padding:4px 10px; font-size:12px; color:var(--bad);">🗑️ 초기화</button>
     </div>`;
 }
 
@@ -395,7 +506,27 @@ function bindBrushControls(scope, galleryId){
       s.classList.add('active'); 
     };
   });
-  scope.querySelector('#brushSize').oninput = (e)=>{ currentBrush.size = parseInt(e.target.value); };
+
+  const tBrush = scope.querySelector('#toolBrush');
+  const tFill = scope.querySelector('#toolFill');
+  if(tBrush && tFill){
+    tBrush.onclick = ()=>{ currentBrush.tool='brush'; tBrush.classList.add('active'); tFill.classList.remove('active'); };
+    tFill.onclick = ()=>{ currentBrush.tool='fill'; tFill.classList.add('active'); tBrush.classList.remove('active'); };
+  }
+
+  scope.querySelector('#brushSize').oninput = (e)=>{ 
+    currentBrush.size = parseInt(e.target.value); 
+    scope.querySelector('#brushSizeVal').textContent = `${currentBrush.size}px`;
+  };
+
+  scope.querySelector('#brushOpacity').oninput = (e)=>{
+    const val = parseInt(e.target.value);
+    currentBrush.opacity = val / 100;
+    scope.querySelector('#brushOpacityVal').textContent = `${val}%`;
+  };
+
+  scope.querySelector('#undoBtn').onclick = ()=> undo(canvas, galleryId);
+  scope.querySelector('#redoBtn').onclick = ()=> redo(canvas, galleryId);
   scope.querySelector('#clearBtn').onclick = ()=>{
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height);
@@ -404,24 +535,48 @@ function bindBrushControls(scope, galleryId){
   };
 }
 
-// ---------------- Visitor View & Admin Combined ----------------
-async function renderVisitor(id){
+// ---------------- Gallery & Admin View ----------------
+async function renderVisitor(id, keyFromUrl=null){
   const gallery = await loadGallery(id);
   if(!gallery){
     APP.innerHTML = `<div class="card">존재하지 않는 갤러리입니다. <a class="home-link" href="#">홈으로</a></div>`;
     return;
   }
 
+  const storedOwnerKey = localStorage.getItem(`owner_key_${id}`);
+  const currentKey = keyFromUrl || storedOwnerKey;
+  const isOwner = (currentKey && currentKey === gallery.owner_key);
+  const isMaster = isMasterAdmin();
+  const canManage = isOwner || isMaster;
+
   const myVid = await getVisitorId();
-  const isAdmin = isAdminLoggedIn();
   const savedName = localStorage.getItem('visitor-nickname') || '';
   let currentSort = 'popular';
 
   APP.innerHTML = `
     <div class="topbar">
-      <h1>🎨 ${escapeHtml(gallery.title)} ${isAdmin ? '<span class="badge pinned">👑 관리자 모드</span>' : ''}</h1>
+      <h1>🎨 ${escapeHtml(gallery.title)} 
+        ${isMaster ? '<span class="badge pinned">👑 마스터 모드</span>' : (isOwner ? '<span class="badge public">🔑 갤러리 소유자</span>' : '')}
+      </h1>
       <a class="home-link" href="#">홈으로</a>
     </div>
+
+    ${canManage ? `
+      <div class="card" style="background:#f4f9f5; border-color:var(--good);">
+        <div class="row" style="justify-content:space-between; margin-bottom:8px;">
+          <h2 style="margin:0;">⚙️ 갤러리 관리 옵션</h2>
+          ${isMaster ? `<button class="danger" id="deleteGalleryBtn" style="padding:4px 10px; font-size:11px;">🚨 갤러리 삭제</button>` : ''}
+        </div>
+        <div class="row" style="margin-bottom:8px;">
+          <input type="text" id="galleryTitle" value="${escapeHtml(gallery.title)}" placeholder="갤러리 이름" style="flex:1;">
+          <select id="galleryPublic">
+            <option value="true" ${gallery.is_public?'selected':''}>🌐 공개</option>
+            <option value="false" ${!gallery.is_public?'selected':''}>🔒 비공개</option>
+          </select>
+          <button id="saveSettingBtn">저장</button>
+        </div>
+      </div>
+    ` : ''}
 
     <div class="card">
       <h2>✏️ 캔버스에 그림 그리기</h2>
@@ -447,6 +602,28 @@ async function renderVisitor(id){
 
     <div id="subFeed" class="grid"><span class="small">불러오는 중...</span></div>
   `;
+
+  if(canManage){
+    document.getElementById('saveSettingBtn').onclick = async ()=>{
+      gallery.title = document.getElementById('galleryTitle').value.trim() || '나만의 갤러리';
+      gallery.is_public = document.getElementById('galleryPublic').value === 'true';
+      await saveGallery(id, gallery);
+      alert('갤러리 설정이 저장되었습니다.');
+      renderVisitor(id, currentKey);
+    };
+
+    const delGBtn = document.getElementById('deleteGalleryBtn');
+    if(delGBtn){
+      delGBtn.onclick = async ()=>{
+        if(confirm('이 갤러리를 완전히 삭제하시겠습니까?')){
+          await supabaseClient.from('submissions').delete().eq('gallery_id', id);
+          await supabaseClient.from('gallery').delete().eq('id', id);
+          alert('갤러리가 삭제되었습니다.');
+          location.hash = '';
+        }
+      };
+    }
+  }
 
   const canvas = document.getElementById('draw');
   setupCanvas(canvas, id);
@@ -476,8 +653,8 @@ async function renderVisitor(id){
     if(document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
 
     let subs = await loadSubs(id);
-    if(!isAdmin) {
-      subs = subs.filter(s=>!s.hidden); // 관리자가 아니면 비공개 작품 숨김
+    if(!canManage) {
+      subs = subs.filter(s=>!s.hidden); 
     }
 
     const feed = document.getElementById('subFeed');
@@ -504,21 +681,18 @@ async function renderVisitor(id){
           ${s.hidden ? '<span class="badge hidden">🔒 비공개</span>' : ''}
           <img src="${s.image}" onclick="openModal('${s.image}', '${escapeHtml(s.author || '익명')}님의 작품')">
           
-          <!-- 좋아요 버튼 (상태에 따라 시각화) -->
           <button class="like-btn ${isLiked ? 'liked' : ''}" data-sid="${s.id}">
             ${isLiked ? '💖 좋아요 완료' : '🤍 좋아요'} (${s.likes||0})
           </button>
           
-          <!-- 관리자 또는 작성자 제어 기능 -->
-          ${(isAdmin || isMine) ? `
+          ${(canManage || isMine) ? `
             <div class="admin-actions">
-              ${isAdmin ? `<button class="ghost pinBtn">${s.pinned ? '📌 고정해제' : '📌 고정'}</button>` : ''}
-              ${isAdmin ? `<button class="ghost hideBtn">${s.hidden ? '👁️ 공개' : '🔒 비공개'}</button>` : ''}
+              ${canManage ? `<button class="ghost pinBtn">${s.pinned ? '📌 고정해제' : '📌 고정'}</button>` : ''}
+              ${canManage ? `<button class="ghost hideBtn">${s.hidden ? '👁️ 공개' : '🔒 비공개'}</button>` : ''}
               <button class="danger deleteBtn">🗑️ 삭제</button>
             </div>
           ` : ''}
 
-          <!-- 댓글 보기 및 작성 영역 -->
           <div class="comment-section">
             <div class="comment-list">
               ${comments.length === 0 ? '<div class="small" style="color:#aaa;">댓글이 없습니다.</div>' : 
@@ -539,12 +713,10 @@ async function renderVisitor(id){
     }
     feed.innerHTML = html;
 
-    // 이벤트 바인딩
     feed.querySelectorAll('.thumb-card').forEach(card=>{
       const sid = card.dataset.sid;
       const target = subs.find(x=>x.id===sid);
 
-      // 좋아요
       card.querySelector('.like-btn').onclick = async ()=>{
         target.likedBy = target.likedBy || [];
         if(target.likedBy.includes(myVid)){
@@ -558,7 +730,6 @@ async function renderVisitor(id){
         refreshFeed();
       };
 
-      // 삭제
       const delBtn = card.querySelector('.deleteBtn');
       if(delBtn){
         delBtn.onclick = async ()=>{
@@ -566,7 +737,6 @@ async function renderVisitor(id){
         };
       }
 
-      // 관리자 - 고정
       const pinBtn = card.querySelector('.pinBtn');
       if(pinBtn){
         pinBtn.onclick = async ()=>{
@@ -574,7 +744,6 @@ async function renderVisitor(id){
         };
       }
 
-      // 관리자 - 비공개
       const hideBtn = card.querySelector('.hideBtn');
       if(hideBtn){
         hideBtn.onclick = async ()=>{
@@ -582,7 +751,6 @@ async function renderVisitor(id){
         };
       }
 
-      // 댓글 등록
       const commentBtn = card.querySelector('.commentBtn');
       if(commentBtn){
         commentBtn.onclick = async ()=>{
