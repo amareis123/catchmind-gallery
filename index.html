@@ -32,7 +32,6 @@
 
   .badge { display:inline-block; font-size:11px; padding:2px 8px; border-radius:20px; font-weight:700; }
   .badge.pinned { background:#ffe3ec; color:var(--accent); }
-  .badge.thumb { background:#e3f2fd; color:#1976d2; }
   .badge.hidden { background:#e2e2e2; color:#666; }
   .badge.public { background:#d9f3df; color:var(--good); }
   
@@ -43,7 +42,6 @@
 
   .thumb-card { width: 220px; background:#fbfaf5; border:1px solid var(--line); border-radius:10px; padding:10px; font-size:12px; position:relative; }
   .thumb-card.pinned-card { border: 2px solid var(--accent); background:#fff0f5; }
-  .thumb-card.thumb-selected { border: 2px solid #1976d2; background:#f0f7ff; }
   .thumb-card img { width:100%; border-radius:6px; display:block; margin-bottom:6px; background:#fff; cursor:pointer; }
   
   .like-btn { background:#fff; color:#666; border:1px solid var(--line); font-size:12px; padding:6px 10px; margin-top:4px; border-radius:6px; width:100%; font-weight:600; }
@@ -53,9 +51,13 @@
   .admin-actions button { font-size:10px; padding:3px 6px; border-radius:6px; }
   
   .comment-section { margin-top:8px; border-top:1px dashed var(--line); padding-top:8px; }
-  .comment-list { max-height:120px; overflow-y:auto; margin-bottom:8px; display:flex; flex-direction:column; gap:4px; }
-  .comment-item { background:#fff; padding:6px 8px; border-radius:6px; font-size:11px; border:1px solid #f0ebd9; word-break:break-all; }
+  .comment-list { max-height:140px; overflow-y:auto; margin-bottom:8px; display:flex; flex-direction:column; gap:4px; }
+  .comment-item { background:#fff; padding:6px 8px; border-radius:6px; font-size:11px; border:1px solid #f0ebd9; word-break:break-all; position:relative; }
   .comment-item .c-author { font-weight:bold; color:#333; margin-right:4px; }
+  .comment-item .edited-tag { color:#888; font-size:9px; margin-left:4px; }
+  .comment-actions { display:inline-block; margin-left:6px; }
+  .comment-actions button { font-size:9px; padding:1px 4px; border-radius:4px; background:none; color:#777; border:1px solid #ddd; }
+  .comment-actions button:hover { background:#eee; }
 
   .tool-btn { padding:6px 12px; font-size:12px; background:#eee; color:#333; }
   .tool-btn.active { background:var(--ink); color:#fff; }
@@ -147,7 +149,6 @@ async function saveGallery(id, obj){
       title: obj.title || '나만의 갤러리',
       is_public: obj.is_public !== undefined ? obj.is_public : true,
       cover_image: obj.cover_image || '',
-      thumbnail_sub_id: obj.thumbnail_sub_id !== undefined ? obj.thumbnail_sub_id : null,
       topic: obj.topic || '',
       banned_visitors: obj.banned_visitors || []
     }, { onConflict: 'id' }).select();
@@ -219,12 +220,32 @@ async function loadComments(subId){
 
 async function addComment(subId, author, content){
   try {
+    const vId = await getVisitorId();
     const { error } = await supabaseClient.from('comments').insert({
       id: genId(10),
       submission_id: subId,
       author: author || '익명',
-      content: content
+      content: content,
+      visitor_id: vId,
+      is_edited: false
     });
+    return !error;
+  } catch(e){ return false; }
+}
+
+async function updateComment(cid, newContent){
+  try {
+    const { error } = await supabaseClient.from('comments').update({
+      content: newContent,
+      is_edited: true
+    }).eq('id', cid);
+    return !error;
+  } catch(e){ return false; }
+}
+
+async function deleteComment(cid){
+  try {
+    const { error } = await supabaseClient.from('comments').delete().eq('id', cid);
     return !error;
   } catch(e){ return false; }
 }
@@ -251,8 +272,8 @@ window.addEventListener('keydown', (e) => {
 
   if (e.ctrlKey || e.metaKey) {
     if (e.key.toLowerCase() === 'z') {
-      if (e.shiftKey) redo(currentActiveCanvas, currentActiveGalleryId);
-      else undo(currentActiveCanvas, currentActiveGalleryId);
+      if (e.shiftKey) { redo(currentActiveCanvas, currentActiveGalleryId); } 
+      else { undo(currentActiveCanvas, currentActiveGalleryId); }
       e.preventDefault();
     } else if (e.key.toLowerCase() === 'y') {
       redo(currentActiveCanvas, currentActiveGalleryId);
@@ -261,9 +282,39 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
+// ---------------- Cover Image Priority Calculation ----------------
+function determineGalleryCover(gallery, visibleSubs){
+  if(visibleSubs.length === 0) return null;
+
+  // 1순위: 지정된 썸네일
+  if(gallery.cover_image && visibleSubs.some(s=>s.image === gallery.cover_image)){
+    return gallery.cover_image;
+  }
+
+  // 2순위: 고정된 그림중 랜덤
+  const pinnedSubs = visibleSubs.filter(s => s.pinned);
+  if(pinnedSubs.length > 0){
+    const randomIndex = Math.floor(Math.random() * pinnedSubs.length);
+    return pinnedSubs[randomIndex].image;
+  }
+
+  // 3순위: 좋아요가 가장 많은 그림 중 랜덤
+  const maxLikes = Math.max(...visibleSubs.map(s => s.likes || 0));
+  if(maxLikes > 0){
+    const topLikedSubs = visibleSubs.filter(s => (s.likes || 0) === maxLikes);
+    const randomIndex = Math.floor(Math.random() * topLikedSubs.length);
+    return topLikedSubs[randomIndex].image;
+  }
+
+  // 4순위: 최신 그림
+  return visibleSubs[0].image;
+}
+
 // ---------------- Home ----------------
 async function renderHome(){
   const adminState = isMasterAdmin();
+  let gallerySort = 'popular';
+
   APP.innerHTML = `
     <div class="topbar">
       <h1>🎨 낙서 갤러리 Pro</h1>
@@ -284,7 +335,14 @@ async function renderHome(){
     </div>
 
     <div class="card">
-      <h2>🔍 공개 갤러리 둘러보기</h2>
+      <div class="row" style="justify-content:space-between; margin-bottom:8px;">
+        <h2>🔍 공개 갤러리 둘러보기</h2>
+        <select id="gallerySortSelect" style="font-size:12px; padding:4px 8px;">
+          <option value="popular">🔥 인기순</option>
+          <option value="newest">✨ 최신순</option>
+          <option value="oldest">⏳ 오래된순</option>
+        </select>
+      </div>
       <div class="row" style="margin-bottom:14px;">
         <input type="text" id="searchInput" placeholder="갤러리 이름 검색..." style="flex:1;">
         <button class="secondary" id="searchBtn">검색</button>
@@ -328,49 +386,45 @@ async function renderHome(){
     }
   };
 
-  // 우선순위 정렬 함수 (1. 썸네일 지정 2. 고정 3. 좋아요 수 4. 오래된 그림)
-  function sortSubmissionsWithPriority(subs, thumbnailSubId) {
-    return subs.sort((a, b) => {
-      const aIsThumb = a.id === thumbnailSubId;
-      const bIsThumb = b.id === thumbnailSubId;
-      if (aIsThumb !== bIsThumb) return bIsThumb ? 1 : -1;
-
-      if (a.pinned !== b.pinned) return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
-      
-      const likesA = a.likes || 0;
-      const likesB = b.likes || 0;
-      if (likesA !== likesB) return likesB - likesA;
-
-      return new Date(a.created_at) - new Date(b.created_at);
-    });
-  }
-
   async function loadGalleries(q=''){
     const grid = document.getElementById('publicGrid');
-    const galleries = await loadPublicGalleries(q);
+    let galleries = await loadPublicGalleries(q);
     if(galleries.length === 0){ grid.innerHTML = '<span class="small">공개된 갤러리가 없습니다.</span>'; return; }
 
-    let html = '';
+    const galleryDataList = [];
     for(const g of galleries){
       const subs = await loadSubs(g.id);
       const visible = subs.filter(s=>!s.hidden);
-      
-      let cover = null;
-      if(visible.length > 0) {
-        const sorted = sortSubmissionsWithPriority([...visible], g.thumbnail_sub_id);
-        cover = sorted[0].image;
-      }
+      const totalLikes = visible.reduce((acc, cur) => acc + (cur.likes || 0), 0);
+      const cover = determineGalleryCover(g, visible);
+      galleryDataList.push({ gallery: g, visibleCount: visible.length, cover, totalLikes });
+    }
 
+    // 정렬 로직 (인기순 / 최신순 / 오래된순)
+    galleryDataList.sort((a,b)=>{
+      if(gallerySort === 'popular') return b.totalLikes - a.totalLikes;
+      if(gallerySort === 'newest') return new Date(b.gallery.created_at) - new Date(a.gallery.created_at);
+      if(gallerySort === 'oldest') return new Date(a.gallery.created_at) - new Date(b.gallery.created_at);
+    });
+
+    let html = '';
+    for(const item of galleryDataList){
+      const g = item.gallery;
       html += `
         <div class="gallery-card" onclick="location.hash='visit=${g.id}'">
-          ${cover ? `<img class="cover" src="${cover}">` : `<div class="cover">🎨 그림이 없습니다</div>`}
+          ${item.cover ? `<img class="cover" src="${item.cover}">` : `<div class="cover">🎨 그림이 없습니다</div>`}
           <div style="margin-top:8px; font-weight:bold; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(g.title)}</div>
-          <div class="small" style="margin-top:2px;">작품 ${visible.length}개</div>
+          <div class="small" style="margin-top:2px;">작품 ${item.visibleCount}개 · 💖 ${item.totalLikes}</div>
         </div>
       `;
     }
     grid.innerHTML = html;
   }
+
+  document.getElementById('gallerySortSelect').onchange = (e)=>{
+    gallerySort = e.target.value;
+    loadGalleries(document.getElementById('searchInput').value.trim());
+  };
 
   document.getElementById('searchBtn').onclick = ()=>{ loadGalleries(document.getElementById('searchInput').value.trim()); };
   loadGalleries();
@@ -389,11 +443,8 @@ function saveState(canvas, galleryId){
   if(undoStack.length >= MAX_UNDO) undoStack.shift();
   undoStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
   redoStack = [];
-  
   if(galleryId) {
-    try {
-      localStorage.setItem(`draft-canvas-${galleryId}`, canvas.toDataURL('image/png'));
-    } catch(e){}
+    try { localStorage.setItem(`draft-canvas-${galleryId}`, canvas.toDataURL('image/png')); } catch(e){}
   }
 }
 
@@ -448,7 +499,7 @@ function floodFill(canvas, startX, startY, fillColorRgba){
       if(x > 0) queue.push([x - 1, y]);
       if(x < width - 1) queue.push([x + 1, y]);
       if(y > 0) queue.push([x, y - 1]);
-      if(y < height - 1) queue.push([x + 1, y]);
+      if(y < height - 1) queue.push([x, y + 1]);
     }
   }
   ctx.putImageData(imgData, 0, 0);
@@ -540,7 +591,7 @@ function brushControlsHtml(){
       <input type="range" min="1" max="50" value="4" id="brushSize" style="width:70px;">
       <span class="small" id="brushSizeVal">4px</span>
       <div style="border-left:1px solid #ccc; height:16px; margin:0 4px;"></div>
-      <span class="small">불투명도:</span>
+      <span class="small">투명도:</span>
       <input type="range" min="5" max="100" value="100" id="brushOpacity" style="width:70px;">
       <span class="small" id="brushOpacityVal">100%</span>
     </div>
@@ -725,12 +776,7 @@ async function renderVisitor(id, keyFromUrl=null){
     if(!feed) return;
     if(subs.length === 0){ feed.innerHTML = '<span class="small">등록된 그림이 없습니다.</span>'; return; }
 
-    // 작품 목록 정렬 (우선순위: 썸네일 지정 -> 고정 -> 좋아요 수 -> 선택된 정렬 방식)
     subs.sort((a,b)=>{
-      const aIsThumb = a.id === gallery.thumbnail_sub_id;
-      const bIsThumb = b.id === gallery.thumbnail_sub_id;
-      if (aIsThumb !== bIsThumb) return bIsThumb ? 1 : -1;
-
       if(b.pinned !== a.pinned) return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
       if(currentSort === 'popular') return (b.likes||0) - (a.likes||0);
       if(currentSort === 'newest') return new Date(b.created_at) - new Date(a.created_at);
@@ -741,13 +787,13 @@ async function renderVisitor(id, keyFromUrl=null){
     for(const s of subs){
       const isMine = s.visitor_id === myVid;
       const isLiked = (s.likedBy || []).includes(myVid);
-      const isThumb = s.id === gallery.thumbnail_sub_id;
+      const isCover = (gallery.cover_image === s.image);
       const comments = await loadComments(s.id);
 
       html += `
-        <div class="thumb-card ${s.pinned ? 'pinned-card' : ''} ${isThumb ? 'thumb-selected' : ''}" data-sid="${s.id}">
+        <div class="thumb-card ${s.pinned ? 'pinned-card' : ''}" data-sid="${s.id}">
           <span class="author">👤 ${escapeHtml(s.author || '익명')} ${isMine?'(나)':''}</span>
-          ${isThumb ? '<span class="badge thumb">🖼️ 썸네일</span>' : ''}
+          ${isCover ? '<span class="badge public">🖼️ 대표 썸네일</span>' : ''}
           ${s.pinned ? '<span class="badge pinned">📌 고정됨</span>' : ''}
           ${s.hidden ? '<span class="badge hidden">🔒 비공개</span>' : ''}
           <img src="${s.image}" onclick="openModal('${s.image}', '${escapeHtml(s.author || '익명')}님의 작품')">
@@ -758,7 +804,7 @@ async function renderVisitor(id, keyFromUrl=null){
           
           ${(canManage || isMine) ? `
             <div class="admin-actions">
-              ${canManage ? `<button class="ghost thumbBtn">${isThumb ? '🖼️ 썸네일 해제' : '🖼️ 썸네일 지정'}</button>` : ''}
+              ${canManage ? `<button class="secondary setCoverBtn">${isCover ? '🖼️ 썸네일 해제' : '🖼️ 썸네일 지정'}</button>` : ''}
               ${canManage ? `<button class="ghost pinBtn">${s.pinned ? '📌 고정해제' : '📌 고정'}</button>` : ''}
               ${canManage ? `<button class="ghost hideBtn">${s.hidden ? '👁️ 공개' : '🔒 비공개'}</button>` : ''}
               <button class="danger deleteBtn">🗑️ 삭제</button>
@@ -768,11 +814,21 @@ async function renderVisitor(id, keyFromUrl=null){
           <div class="comment-section">
             <div class="comment-list">
               ${comments.length === 0 ? '<div class="small" style="color:#aaa;">댓글이 없습니다.</div>' : 
-                comments.map(c=>`
-                  <div class="comment-item">
-                    <span class="c-author">${escapeHtml(c.author)}</span>: ${escapeHtml(c.content)}
-                  </div>
-                `).join('')
+                comments.map(c=>{
+                  const isMyComment = (c.visitor_id === myVid) || canManage;
+                  return `
+                    <div class="comment-item" data-cid="${c.id}">
+                      <span class="c-author">${escapeHtml(c.author)}</span>: <span class="c-content">${escapeHtml(c.content)}</span>
+                      ${c.is_edited ? '<span class="edited-tag">(수정됨)</span>' : ''}
+                      ${isMyComment ? `
+                        <span class="comment-actions">
+                          <button class="editCommentBtn">수정</button>
+                          <button class="delCommentBtn">삭제</button>
+                        </span>
+                      ` : ''}
+                    </div>
+                  `;
+                }).join('')
               }
             </div>
             <div class="row" style="gap:4px;">
@@ -802,40 +858,38 @@ async function renderVisitor(id, keyFromUrl=null){
         refreshFeed();
       };
 
-      const thumbBtn = card.querySelector('.thumbBtn');
-      if(thumbBtn){
-        thumbBtn.onclick = async ()=>{
-          gallery.thumbnail_sub_id = (gallery.thumbnail_sub_id === sid) ? null : sid;
-          await saveGallery(id, gallery);
-          refreshFeed();
+      const setCoverBtn = card.querySelector('.setCoverBtn');
+      if(setCoverBtn){
+        setCoverBtn.onclick = async ()=>{
+          gallery.cover_image = (gallery.cover_image === target.image) ? '' : target.image;
+          const ok = await saveGallery(id, gallery);
+          if(ok) refreshFeed();
+          else alert('썸네일 저장 실패! Supabase gallery 테이블을 확인해주세요.');
         };
       }
 
       const delBtn = card.querySelector('.deleteBtn');
       if(delBtn){
         delBtn.onclick = async ()=>{
-          if(confirm('이 그림을 삭제하시겠습니까?')){ 
-            if(gallery.thumbnail_sub_id === sid) {
-              gallery.thumbnail_sub_id = null;
-              await saveGallery(id, gallery);
-            }
-            await deleteSub(sid); 
-            refreshFeed(); 
-          }
+          if(confirm('이 그림을 삭제하시겠습니까?')){ await deleteSub(sid); refreshFeed(); }
         };
       }
 
       const pinBtn = card.querySelector('.pinBtn');
       if(pinBtn){
         pinBtn.onclick = async ()=>{
-          target.pinned = !target.pinned; await updateSub(target); refreshFeed();
+          target.pinned = !target.pinned; 
+          await updateSub(target);
+          refreshFeed();
         };
       }
 
       const hideBtn = card.querySelector('.hideBtn');
       if(hideBtn){
         hideBtn.onclick = async ()=>{
-          target.hidden = !target.hidden; await updateSub(target); refreshFeed();
+          target.hidden = !target.hidden; 
+          await updateSub(target);
+          refreshFeed();
         };
       }
 
@@ -851,6 +905,33 @@ async function renderVisitor(id, keyFromUrl=null){
           refreshFeed();
         };
       }
+
+      card.querySelectorAll('.comment-item').forEach(cItem=>{
+        const cid = cItem.dataset.cid;
+        const editBtn = cItem.querySelector('.editCommentBtn');
+        if(editBtn){
+          editBtn.onclick = async ()=>{
+            const currentContent = cItem.querySelector('.c-content').innerText;
+            const updated = prompt('댓글을 수정하세요:', currentContent);
+            if(updated !== null && updated.trim() !== '' && updated !== currentContent){
+              const ok = await updateComment(cid, updated.trim());
+              if(ok) refreshFeed();
+              else alert('댓글 수정 실패!');
+            }
+          };
+        }
+
+        const delCBtn = cItem.querySelector('.delCommentBtn');
+        if(delCBtn){
+          delCBtn.onclick = async ()=>{
+            if(confirm('이 댓글을 삭제하시겠습니까?')){
+              const ok = await deleteComment(cid);
+              if(ok) refreshFeed();
+              else alert('댓글 삭제 실패!');
+            }
+          };
+        }
+      });
     });
   }
 
