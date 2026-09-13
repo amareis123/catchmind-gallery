@@ -102,7 +102,7 @@ let visitorId = null;
 
 let undoStack = [];
 let redoStack = [];
-const MAX_UNDO = 10;
+const MAX_UNDO = 50; // 최대 50회까지 세밀한 되돌리기 허용
 let currentActiveCanvas = null;
 let currentActiveGalleryId = null;
 
@@ -400,7 +400,6 @@ async function renderHome(){
       galleryDataList.push({ gallery: g, visibleCount: visible.length, cover, totalLikes });
     }
 
-    // 정렬 로직 (인기순 / 최신순 / 오래된순)
     galleryDataList.sort((a,b)=>{
       if(gallerySort === 'popular') return b.totalLikes - a.totalLikes;
       if(gallerySort === 'newest') return new Date(b.gallery.created_at) - new Date(a.gallery.created_at);
@@ -666,6 +665,7 @@ async function renderVisitor(id, keyFromUrl=null){
 
   const myVid = await getVisitorId();
   const savedName = localStorage.getItem('visitor-nickname') || '';
+  const savedCommentNick = localStorage.getItem('visitor-comment-nickname') || savedName || '';
   let currentSort = 'popular';
 
   APP.innerHTML = `
@@ -680,7 +680,7 @@ async function renderVisitor(id, keyFromUrl=null){
       <div class="card" style="background:#f4f9f5; border-color:var(--good);">
         <div class="row" style="justify-content:space-between; margin-bottom:8px;">
           <h2 style="margin:0;">⚙️ 갤러리 관리 옵션</h2>
-          ${isMaster ? `<button class="danger" id="deleteGalleryBtn" style="padding:4px 10px; font-size:11px;">🚨 갤러리 삭제</button>` : ''}
+          <button class="danger" id="deleteGalleryBtn" style="padding:4px 10px; font-size:11px;">🚨 갤러리 삭제</button>
         </div>
         <div class="row" style="margin-bottom:8px;">
           <input type="text" id="galleryTitle" value="${escapeHtml(gallery.title)}" placeholder="갤러리 이름" style="flex:1;">
@@ -730,7 +730,11 @@ async function renderVisitor(id, keyFromUrl=null){
     const delGBtn = document.getElementById('deleteGalleryBtn');
     if(delGBtn){
       delGBtn.onclick = async ()=>{
-        if(confirm('이 갤러리를 완전히 삭제하시겠습니까?')){
+        if(confirm('이 갤러리를 완전히 삭제하시겠습니까? (되돌릴 수 없습니다)')){
+          const subs = await loadSubs(id);
+          for(const s of subs){
+            await supabaseClient.from('comments').delete().eq('submission_id', s.id);
+          }
           await supabaseClient.from('submissions').delete().eq('gallery_id', id);
           await supabaseClient.from('gallery').delete().eq('id', id);
           alert('갤러리가 삭제되었습니다.');
@@ -831,7 +835,8 @@ async function renderVisitor(id, keyFromUrl=null){
                 }).join('')
               }
             </div>
-            <div class="row" style="gap:4px;">
+            <div class="row" style="gap:4px; margin-bottom:4px;">
+              <input type="text" placeholder="닉네임" class="commentAuthorInput" value="${escapeHtml(savedCommentNick)}" style="width:75px; font-size:11px; padding:4px 6px;">
               <input type="text" placeholder="댓글 작성..." class="commentInput" style="font-size:11px; padding:4px 6px; flex:1;">
               <button class="commentBtn" style="padding:4px 8px; font-size:11px;">등록</button>
             </div>
@@ -896,11 +901,14 @@ async function renderVisitor(id, keyFromUrl=null){
       const commentBtn = card.querySelector('.commentBtn');
       if(commentBtn){
         commentBtn.onclick = async ()=>{
+          const authorInput = card.querySelector('.commentAuthorInput');
           const input = card.querySelector('.commentInput');
           const val = input.value.trim();
           if(!val) return;
-          const author = localStorage.getItem('visitor-nickname') || '익명';
-          await addComment(sid, author, val);
+          const commentAuthor = authorInput.value.trim() || '익명';
+          localStorage.setItem('visitor-comment-nickname', commentAuthor);
+
+          await addComment(sid, commentAuthor, val);
           input.value = '';
           refreshFeed();
         };
