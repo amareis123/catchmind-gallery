@@ -44,7 +44,7 @@
   .thumb-card { width: 220px; background:#fbfaf5; border:1px solid var(--line); border-radius:10px; padding:10px; font-size:12px; position:relative; }
   .thumb-card.pinned-card { border: 2px solid var(--accent); background:#fff0f5; }
   .thumb-card.hidden-card { opacity: 0.65; border: 1px dashed #888; }
-  .thumb-card img { width:100%; border-radius:6px; display:block; margin-bottom:6px; background:#fff; cursor:pointer; }
+  .thumb-card img.main-img { width:100%; border-radius:6px; display:block; margin-bottom:6px; background:#fff; cursor:pointer; }
   
   .like-btn { background:#fff; color:#666; border:1px solid var(--line); font-size:12px; padding:6px 10px; margin-top:4px; border-radius:6px; width:100%; font-weight:600; }
   .like-btn.liked { background:#ffe3ec; color:var(--accent); border-color:var(--accent); }
@@ -53,13 +53,16 @@
   .admin-actions button { font-size:10px; padding:3px 6px; border-radius:6px; }
   
   .comment-section { margin-top:8px; border-top:1px dashed var(--line); padding-top:8px; }
-  .comment-list { max-height:140px; overflow-y:auto; margin-bottom:8px; display:flex; flex-direction:column; gap:4px; }
+  .comment-list { max-height:180px; overflow-y:auto; margin-bottom:8px; display:flex; flex-direction:column; gap:6px; }
   .comment-item { background:#fff; padding:6px 8px; border-radius:6px; font-size:11px; border:1px solid #f0ebd9; word-break:break-all; position:relative; }
   .comment-item .c-author { font-weight:bold; color:#333; margin-right:4px; }
   .comment-item .edited-tag { color:#888; font-size:9px; margin-left:4px; }
   .comment-actions { display:inline-block; margin-left:6px; }
   .comment-actions button { font-size:9px; padding:1px 4px; border-radius:4px; background:none; color:#777; border:1px solid #ddd; }
   .comment-actions button:hover { background:#eee; }
+  
+  /* 그림 댓글 스타일 */
+  .comment-draw-thumb { margin-top:4px; border-radius:4px; border:1px solid var(--line); max-width:100%; height:60px; object-fit:cover; cursor:pointer; display:block; }
 
   .tool-btn { padding:6px 12px; font-size:12px; background:#eee; color:#333; }
   .tool-btn.active { background:var(--ink); color:#fff; }
@@ -70,13 +73,18 @@
   .msg.ok { color: var(--good); } .msg.no { color: var(--bad); }
   a.home-link { color:#8a887d; font-size:12px; text-decoration:none; }
 
+  /* 모달 스타일 */
   .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; justify-content:center; align-items:center; padding:20px; }
   .modal-overlay.active { display:flex; }
-  .modal-content { max-width:90%; max-height:90%; background:#fff; border-radius:12px; padding:16px; text-align:center; position:relative; }
+  .modal-content { max-width:90%; max-height:90%; background:#fff; border-radius:12px; padding:16px; text-align:center; position:relative; overflow-y:auto; }
   .modal-content img { max-width:100%; max-height:70vh; border-radius:8px; display:block; margin:0 auto; }
   .modal-close { position:absolute; top:8px; right:12px; background:none; border:none; font-size:24px; cursor:pointer; color:#333; }
 
-  .filter-toggle { display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:bold; cursor:pointer; background:#fff; padding:4px 10px; border-radius:20px; border:1px solid var(--line); }
+  /* 그림 수정 댓글 모달 전용 */
+  .edit-draw-container { display:flex; flex-direction:column; align-items:center; gap:8px; text-align:left; }
+  .compare-view { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-top:10px; }
+  .compare-box { text-align:center; }
+  .compare-box img { max-width:300px; height:auto; border-radius:8px; border:1px solid var(--line); }
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -84,11 +92,28 @@
 <body>
 <div id="app"><div class="card">불러오는 중...</div></div>
 
-<div class="modal-overlay" id="imgModal" onclick="closeModal()">
+<!-- 이미지 팝업 모달 -->
+<div class="modal-overlay" id="imgModal" onclick="closeModal('imgModal')">
   <div class="modal-content" onclick="event.stopPropagation()">
-    <button class="modal-close" onclick="closeModal()">&times;</button>
-    <img id="modalImg" src="">
-    <div id="modalCaption" style="margin-top:10px; font-weight:bold; font-size:14px;"></div>
+    <button class="modal-close" onclick="closeModal('imgModal')">&times;</button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<!-- 그림 수정 댓글 캔버스 모달 -->
+<div class="modal-overlay" id="editDrawModal">
+  <div class="modal-content" style="max-width:540px;" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal('editDrawModal')">&times;</button>
+    <h3 style="margin-top:0;">🎨 그림 덧그리기 / 수정하기</h3>
+    <div class="edit-draw-container">
+      <canvas id="editCommentCanvas"></canvas>
+      <div id="editBrushControls"></div>
+      <input type="text" id="editCommentText" placeholder="수정 소감이나 댓글 입력..." style="width:100%; margin-top:6px;">
+      <div class="row" style="width:100%; justify-content:flex-end; margin-top:8px;">
+        <button class="ghost" onclick="closeModal('editDrawModal')">취소</button>
+        <button id="saveEditCommentBtn">댓글 및 그림 등록</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -110,6 +135,8 @@ const MAX_UNDO = 100;
 let currentActiveCanvas = null;
 let currentActiveGalleryId = null;
 
+let activeEditTargetSub = null; // 수정 중인 그림 정보
+
 function escapeHtml(s){ const d = document.createElement('div'); d.innerText = s == null ? '' : String(s); return d.innerHTML; }
 function genId(len){
   const chars = 'abcdefghijkmnopqrstuvwxyz23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -117,12 +144,32 @@ function genId(len){
   return s;
 }
 
-function openModal(imgSrc, caption){
-  document.getElementById('modalImg').src = imgSrc;
-  document.getElementById('modalCaption').innerText = caption || '';
-  document.getElementById('imgModal').classList.add('active');
+function openModal(id){ document.getElementById(id).classList.add('active'); }
+function closeModal(id){ document.getElementById(id).classList.remove('active'); }
+
+function showImageModal(imgSrc, caption){
+  const body = document.getElementById('modalBody');
+  body.innerHTML = `<img src="${imgSrc}"><div style="margin-top:10px; font-weight:bold;">${escapeHtml(caption)}</div>`;
+  openModal('imgModal');
 }
-function closeModal(){ document.getElementById('imgModal').classList.remove('active'); }
+
+function showCompareModal(origImg, editedImg, author, editor){
+  const body = document.getElementById('modalBody');
+  body.innerHTML = `
+    <h3>🖼️ 그림 비교하기</h3>
+    <div class="compare-view">
+      <div class="compare-box">
+        <div class="small" style="font-weight:bold; margin-bottom:4px;">🎨 원본 (${escapeHtml(author)})</div>
+        <img src="${origImg}">
+      </div>
+      <div class="compare-box">
+        <div class="small" style="font-weight:bold; margin-bottom:4px; color:var(--accent);">✏️ 수정본 (${escapeHtml(editor)})</div>
+        <img src="${editedImg}">
+      </div>
+    </div>
+  `;
+  openModal('imgModal');
+}
 
 async function getVisitorId(){
   if(visitorId) return visitorId;
@@ -222,7 +269,7 @@ async function loadComments(subId){
   } catch(e){ return []; }
 }
 
-async function addComment(subId, author, content){
+async function addComment(subId, author, content, editedImage=null){
   try {
     const vId = await getVisitorId();
     const { error } = await supabaseClient.from('comments').insert({
@@ -230,6 +277,7 @@ async function addComment(subId, author, content){
       submission_id: subId,
       author: author || '익명',
       content: content,
+      edited_image: editedImage,
       visitor_id: vId,
       is_edited: false
     });
@@ -504,7 +552,7 @@ function floodFill(canvas, startX, startY, fillColorRgba){
   ctx.putImageData(imgData, 0, 0);
 }
 
-function setupCanvas(canvas, galleryId){
+function setupCanvas(canvas, galleryId, initialImageSrc=null){
   currentActiveCanvas = canvas;
   currentActiveGalleryId = galleryId;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -515,16 +563,26 @@ function setupCanvas(canvas, galleryId){
   ctx.fillStyle = '#ffffff'; 
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  const savedDraft = localStorage.getItem(`draft-canvas-${galleryId}`);
-  if(savedDraft){
+  if(initialImageSrc){
     const img = new Image();
+    img.crossOrigin = 'anonymous';
     img.onload = ()=>{ 
-      ctx.drawImage(img, 0, 0); 
-      saveState(canvas, galleryId); 
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height); 
+      saveState(canvas, null); 
     };
-    img.src = savedDraft;
-  } else { 
-    saveState(canvas, galleryId);
+    img.src = initialImageSrc;
+  } else {
+    const savedDraft = galleryId ? localStorage.getItem(`draft-canvas-${galleryId}`) : null;
+    if(savedDraft){
+      const img = new Image();
+      img.onload = ()=>{ 
+        ctx.drawImage(img, 0, 0); 
+        saveState(canvas, galleryId); 
+      };
+      img.src = savedDraft;
+    } else { 
+      saveState(canvas, galleryId);
+    }
   }
 
   let last = null;
@@ -579,36 +637,36 @@ function setupCanvas(canvas, galleryId){
 }
 
 // ---------------- Palette UI Component ----------------
-function brushControlsHtml(){
+function brushControlsHtml(uniquePrefix=''){
   const colors = ['#26251f','#d9534f','#f582ae','#f0ad4e','#3aa655','#3a8fd9','#8b5aa8','#ffffff'];
   return `
     <div class="row" style="margin-top:10px; gap:6px;">
-      <button type="button" class="tool-btn active" id="toolBrush">🖌️ 붓</button>
-      <button type="button" class="tool-btn" id="toolFill">🪣 채우기</button>
+      <button type="button" class="tool-btn active" id="${uniquePrefix}toolBrush">🖌️ 붓</button>
+      <button type="button" class="tool-btn" id="${uniquePrefix}toolFill">🪣 채우기</button>
       <div style="border-left:1px solid #ccc; height:20px; margin:0 4px;"></div>
       ${colors.map(c=>`<span class="swatch ${c==='#26251f'?'active':''}" data-color="${c}" style="background:${c}; ${c==='#ffffff'?'box-shadow:0 0 0 1px #ccc;':''}"></span>`).join('')}
       <div class="color-picker-wrapper">
-        <label for="customColorPicker" style="cursor:pointer; font-weight:600; color:#555;">🎨 팔레트</label>
-        <input type="color" id="customColorPicker" value="#26251f">
+        <label for="${uniquePrefix}customColorPicker" style="cursor:pointer; font-weight:600; color:#555;">🎨 팔레트</label>
+        <input type="color" id="${uniquePrefix}customColorPicker" value="#26251f">
       </div>
     </div>
     <div class="row" style="margin-top:8px;">
       <span class="small">굵기:</span>
-      <input type="range" min="1" max="50" value="4" id="brushSize" style="width:70px;">
-      <span class="small" id="brushSizeVal">4px</span>
+      <input type="range" min="1" max="50" value="4" id="${uniquePrefix}brushSize" style="width:70px;">
+      <span class="small" id="${uniquePrefix}brushSizeVal">4px</span>
       <div style="border-left:1px solid #ccc; height:16px; margin:0 4px;"></div>
       <span class="small">투명도:</span>
-      <input type="range" min="5" max="100" value="100" id="brushOpacity" style="width:70px;">
-      <span class="small" id="brushOpacityVal">100%</span>
+      <input type="range" min="5" max="100" value="100" id="${uniquePrefix}brushOpacity" style="width:70px;">
+      <span class="small" id="${uniquePrefix}brushOpacityVal">100%</span>
     </div>
     <div class="row" style="margin-top:8px;">
-      <button class="ghost" id="undoBtn" type="button" style="padding:4px 10px; font-size:12px;">↩️ 뒤로 (Ctrl+Z)</button>
-      <button class="ghost" id="redoBtn" type="button" style="padding:4px 10px; font-size:12px;">↪️ 다시 (Ctrl+Y)</button>
-      <button class="ghost" id="clearBtn" type="button" style="padding:4px 10px; font-size:12px; color:var(--bad);">🗑️ 초기화</button>
+      <button class="ghost" id="${uniquePrefix}undoBtn" type="button" style="padding:4px 10px; font-size:12px;">↩️ 뒤로 (Ctrl+Z)</button>
+      <button class="ghost" id="${uniquePrefix}redoBtn" type="button" style="padding:4px 10px; font-size:12px;">↪️ 다시 (Ctrl+Y)</button>
+      <button class="ghost" id="${uniquePrefix}clearBtn" type="button" style="padding:4px 10px; font-size:12px; color:var(--bad);">🗑️ 초기화</button>
     </div>`;
 }
 
-function bindBrushControls(scope, galleryId){
+function bindBrushControls(scope, galleryId, uniquePrefix=''){
   const canvas = scope.querySelector('canvas');
   
   scope.querySelectorAll('.swatch').forEach(s=>{
@@ -616,11 +674,12 @@ function bindBrushControls(scope, galleryId){
       currentBrush.color = s.dataset.color; 
       scope.querySelectorAll('.swatch').forEach(x=>x.classList.remove('active')); 
       s.classList.add('active'); 
-      scope.querySelector('#customColorPicker').value = currentBrush.color.length === 7 ? currentBrush.color : '#26251f';
+      const cp = scope.querySelector(`#${uniquePrefix}customColorPicker`);
+      if(cp) cp.value = currentBrush.color.length === 7 ? currentBrush.color : '#26251f';
     };
   });
 
-  const colorPicker = scope.querySelector('#customColorPicker');
+  const colorPicker = scope.querySelector(`#${uniquePrefix}customColorPicker`);
   if(colorPicker){
     colorPicker.oninput = (e)=>{
       currentBrush.color = e.target.value;
@@ -628,32 +687,45 @@ function bindBrushControls(scope, galleryId){
     };
   }
 
-  const tBrush = scope.querySelector('#toolBrush');
-  const tFill = scope.querySelector('#toolFill');
+  const tBrush = scope.querySelector(`#${uniquePrefix}toolBrush`);
+  const tFill = scope.querySelector(`#${uniquePrefix}toolFill`);
   if(tBrush && tFill){
     tBrush.onclick = ()=>{ currentBrush.tool='brush'; tBrush.classList.add('active'); tFill.classList.remove('active'); };
     tFill.onclick = ()=>{ currentBrush.tool='fill'; tFill.classList.add('active'); tBrush.classList.remove('active'); };
   }
 
-  scope.querySelector('#brushSize').oninput = (e)=>{ 
-    currentBrush.size = parseInt(e.target.value); 
-    scope.querySelector('#brushSizeVal').textContent = `${currentBrush.size}px`;
-  };
+  const bSize = scope.querySelector(`#${uniquePrefix}brushSize`);
+  if(bSize){
+    bSize.oninput = (e)=>{ 
+      currentBrush.size = parseInt(e.target.value); 
+      scope.querySelector(`#${uniquePrefix}brushSizeVal`).textContent = `${currentBrush.size}px`;
+    };
+  }
 
-  scope.querySelector('#brushOpacity').oninput = (e)=>{
-    const val = parseInt(e.target.value);
-    currentBrush.opacity = val / 100;
-    scope.querySelector('#brushOpacityVal').textContent = `${val}%`;
-  };
+  const bOpacity = scope.querySelector(`#${uniquePrefix}brushOpacity`);
+  if(bOpacity){
+    bOpacity.oninput = (e)=>{
+      const val = parseInt(e.target.value);
+      currentBrush.opacity = val / 100;
+      scope.querySelector(`#${uniquePrefix}brushOpacityVal`).textContent = `${val}%`;
+    };
+  }
 
-  scope.querySelector('#undoBtn').onclick = ()=> undo(canvas, galleryId);
-  scope.querySelector('#redoBtn').onclick = ()=> redo(canvas, galleryId);
-  scope.querySelector('#clearBtn').onclick = ()=>{
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height);
-    localStorage.removeItem(`draft-canvas-${galleryId}`);
-    saveState(canvas, galleryId);
-  };
+  const undoBtn = scope.querySelector(`#${uniquePrefix}undoBtn`);
+  if(undoBtn) undoBtn.onclick = ()=> undo(canvas, galleryId);
+
+  const redoBtn = scope.querySelector(`#${uniquePrefix}redoBtn`);
+  if(redoBtn) redoBtn.onclick = ()=> redo(canvas, galleryId);
+
+  const clearBtn = scope.querySelector(`#${uniquePrefix}clearBtn`);
+  if(clearBtn){
+    clearBtn.onclick = ()=>{
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+      if(galleryId) localStorage.removeItem(`draft-canvas-${galleryId}`);
+      saveState(canvas, galleryId);
+    };
+  }
 }
 
 // ---------------- Gallery & Admin View ----------------
@@ -735,6 +807,9 @@ async function renderVisitor(id, keyFromUrl=null){
     <div id="subFeed" class="grid"><span class="small">불러오는 중...</span></div>
   `;
 
+  // 댓글용 덧그리기 모달 초기화
+  document.getElementById('editBrushControls').innerHTML = brushControlsHtml('edit_');
+
   const filterToggle = document.getElementById('privateFilterToggle');
   if(filterToggle){
     filterToggle.onchange = (e) => {
@@ -799,7 +874,6 @@ async function renderVisitor(id, keyFromUrl=null){
     submitBtn.disabled = true;
     msg.textContent = '업로드 중...'; msg.className = 'msg';
 
-    // ✅ [색감 탁해짐 완벽 해결] 임시 캔버스에 순백색 배경을 채운 뒤 그림을 병합하여 PNG로 변환
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = canvas.width;
     tempCanvas.height = canvas.height;
@@ -868,21 +942,20 @@ async function renderVisitor(id, keyFromUrl=null){
           ${isCover ? '<span class="badge public">🖼️ 대표 썸네일</span>' : ''}
           ${s.pinned ? '<span class="badge pinned">📌 고정됨</span>' : ''}
           ${s.hidden ? '<span class="badge hidden">🔒 비공개</span>' : ''}
-          <img src="${s.image}" onclick="openModal('${s.image}', '${escapeHtml(s.author || '익명')}님의 작품')">
+          <img class="main-img" src="${s.image}" onclick="showImageModal('${s.image}', '${escapeHtml(s.author || '익명')}님의 작품')">
           
           <button class="like-btn ${isLiked ? 'liked' : ''}" data-sid="${s.id}">
             ${isLiked ? '💖 좋아요 완료' : '🤍 좋아요'} (${s.likes||0})
           </button>
           
-          ${(canManage || isMine) ? `
-            <div class="admin-actions">
-              ${canManage ? `<button class="secondary setCoverBtn">${isCover ? '🖼️ 썸네일 해제' : '🖼️ 썸네일 지정'}</button>` : ''}
-              ${canManage ? `<button class="ghost pinBtn">${s.pinned ? '📌 고정해제' : '📌 고정'}</button>` : ''}
-              ${canManage ? `<button class="ghost hideBtn">${s.hidden ? '👁️ 공개' : '🔒 비공개'}</button>` : ''}
-              ${(canManage && !isMine) ? `<button class="danger banUserBtn">${isAuthorBanned ? '🔓 차단해제' : '🚫 유저 밴'}</button>` : ''}
-              <button class="danger deleteBtn">🗑️ 삭제</button>
-            </div>
-          ` : ''}
+          <div class="admin-actions">
+            <button class="secondary editDrawBtn" style="background:#e8def8; color:#4a4458;">✏️ 덧그리기/수정</button>
+            ${canManage ? `<button class="secondary setCoverBtn">${isCover ? '🖼️ 썸네일 해제' : '🖼️ 썸네일 지정'}</button>` : ''}
+            ${canManage ? `<button class="ghost pinBtn">${s.pinned ? '📌 고정해제' : '📌 고정'}</button>` : ''}
+            ${canManage ? `<button class="ghost hideBtn">${s.hidden ? '👁️ 공개' : '🔒 비공개'}</button>` : ''}
+            ${(canManage && !isMine) ? `<button class="danger banUserBtn">${isAuthorBanned ? '🔓 차단해제' : '🚫 유저 밴'}</button>` : ''}
+            ${(canManage || isMine) ? `<button class="danger deleteBtn">🗑️ 삭제</button>` : ''}
+          </div>
 
           <div class="comment-section">
             <div class="comment-list">
@@ -891,13 +964,20 @@ async function renderVisitor(id, keyFromUrl=null){
                   const isMyComment = (c.visitor_id === myVid) || canManage;
                   return `
                     <div class="comment-item" data-cid="${c.id}">
-                      <span class="c-author">${escapeHtml(c.author)}</span>: <span class="c-content">${escapeHtml(c.content)}</span>
-                      ${c.is_edited ? '<span class="edited-tag">(수정됨)</span>' : ''}
-                      ${isMyComment ? `
-                        <span class="comment-actions">
-                          <button class="editCommentBtn">수정</button>
-                          <button class="delCommentBtn">삭제</button>
-                        </span>
+                      <div>
+                        <span class="c-author">${escapeHtml(c.author)}</span>: <span class="c-content">${escapeHtml(c.content)}</span>
+                        ${c.is_edited ? '<span class="edited-tag">(수정됨)</span>' : ''}
+                        ${isMyComment ? `
+                          <span class="comment-actions">
+                            <button class="editCommentBtn">수정</button>
+                            <button class="delCommentBtn">삭제</button>
+                          </span>
+                        ` : ''}
+                      </div>
+                      ${c.edited_image ? `
+                        <img class="comment-draw-thumb" src="${c.edited_image}" 
+                             onclick="showCompareModal('${s.image}', '${c.edited_image}', '${escapeHtml(s.author||'익명')}', '${escapeHtml(c.author)}')"
+                             title="클릭하여 원본과 비교하기">
                       ` : ''}
                     </div>
                   `;
@@ -905,7 +985,7 @@ async function renderVisitor(id, keyFromUrl=null){
               }
             </div>
             <div class="row" style="gap:4px;">
-              <input type="text" placeholder="댓글을 입력하세요..." class="commentInput" style="font-size:11px; padding:6px 8px; flex:1;" ${isBanned?'disabled':''}>
+              <input type="text" placeholder="댓글 입력..." class="commentInput" style="font-size:11px; padding:6px 8px; flex:1;" ${isBanned?'disabled':''}>
               <button class="commentBtn" style="padding:6px 10px; font-size:11px;" ${isBanned?'disabled':''}>등록</button>
             </div>
           </div>
@@ -917,6 +997,20 @@ async function renderVisitor(id, keyFromUrl=null){
     feed.querySelectorAll('.thumb-card').forEach(card=>{
       const sid = card.dataset.sid;
       const target = subs.find(x=>x.id===sid);
+
+      // 그림 덧그리기/수정하기 버튼 동작
+      const editDrawBtn = card.querySelector('.editDrawBtn');
+      if(editDrawBtn){
+        editDrawBtn.onclick = ()=>{
+          if(isBanned){ alert('차단된 사용자는 작성할 수 없습니다.'); return; }
+          activeEditTargetSub = target;
+          const editCanvas = document.getElementById('editCommentCanvas');
+          setupCanvas(editCanvas, null, target.image);
+          bindBrushControls(document.getElementById('editDrawModal'), null, 'edit_');
+          document.getElementById('editCommentText').value = '';
+          openModal('editDrawModal');
+        };
+      }
 
       card.querySelector('.like-btn').onclick = async ()=>{
         target.likedBy = target.likedBy || [];
@@ -1025,6 +1119,36 @@ async function renderVisitor(id, keyFromUrl=null){
       });
     });
   }
+
+  // 모달 안의 수정본 등록 버튼 처리
+  document.getElementById('saveEditCommentBtn').onclick = async ()=>{
+    if(!activeEditTargetSub) return;
+    const saveBtn = document.getElementById('saveEditCommentBtn');
+    saveBtn.disabled = true;
+
+    const editCanvas = document.getElementById('editCommentCanvas');
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = editCanvas.width;
+    tempCanvas.height = editCanvas.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCtx.fillStyle = '#ffffff';
+    tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+    tempCtx.drawImage(editCanvas, 0, 0);
+
+    const editedImage = tempCanvas.toDataURL('image/png');
+    const text = document.getElementById('editCommentText').value.trim() || '그림을 수정해서 올렸습니다! 🎨';
+    const author = localStorage.getItem('visitor-nickname') || '익명';
+
+    const ok = await addComment(activeEditTargetSub.id, author, text, editedImage);
+    saveBtn.disabled = false;
+
+    if(ok){
+      closeModal('editDrawModal');
+      refreshFeed();
+    } else {
+      alert('등록에 실패했습니다.');
+    }
+  };
 
   refreshFeed();
   pollTimer = setInterval(refreshFeed, 4000);
