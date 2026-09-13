@@ -102,7 +102,7 @@ let visitorId = null;
 
 let undoStack = [];
 let redoStack = [];
-const MAX_UNDO = 50; // 최대 50회까지 세밀한 되돌리기 허용
+const MAX_UNDO = 10;
 let currentActiveCanvas = null;
 let currentActiveGalleryId = null;
 
@@ -286,19 +286,16 @@ window.addEventListener('keydown', (e) => {
 function determineGalleryCover(gallery, visibleSubs){
   if(visibleSubs.length === 0) return null;
 
-  // 1순위: 지정된 썸네일
   if(gallery.cover_image && visibleSubs.some(s=>s.image === gallery.cover_image)){
     return gallery.cover_image;
   }
 
-  // 2순위: 고정된 그림중 랜덤
   const pinnedSubs = visibleSubs.filter(s => s.pinned);
   if(pinnedSubs.length > 0){
     const randomIndex = Math.floor(Math.random() * pinnedSubs.length);
     return pinnedSubs[randomIndex].image;
   }
 
-  // 3순위: 좋아요가 가장 많은 그림 중 랜덤
   const maxLikes = Math.max(...visibleSubs.map(s => s.likes || 0));
   if(maxLikes > 0){
     const topLikedSubs = visibleSubs.filter(s => (s.likes || 0) === maxLikes);
@@ -306,7 +303,6 @@ function determineGalleryCover(gallery, visibleSubs){
     return topLikedSubs[randomIndex].image;
   }
 
-  // 4순위: 최신 그림
   return visibleSubs[0].image;
 }
 
@@ -509,16 +505,22 @@ function setupCanvas(canvas, galleryId){
   currentActiveGalleryId = galleryId;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   canvas.width = 480; canvas.height = 360;
-  ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height);
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   undoStack = []; redoStack = [];
 
   const savedDraft = localStorage.getItem(`draft-canvas-${galleryId}`);
   if(savedDraft){
     const img = new Image();
-    img.onload = ()=>{ ctx.drawImage(img, 0, 0); saveState(canvas, galleryId); };
+    img.onload = ()=>{ 
+      ctx.drawImage(img, 0, 0); 
+      saveState(canvas, galleryId); 
+    };
     img.src = savedDraft;
-  } else { saveState(canvas, galleryId); }
+  } else { 
+    ctx.fillStyle = '#ffffff'; 
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    saveState(canvas, galleryId); 
+  }
 
   let last = null;
   let isFramePending = false;
@@ -659,13 +661,13 @@ async function renderVisitor(id, keyFromUrl=null){
 
   const storedOwnerKey = localStorage.getItem(`owner_key_${id}`);
   const currentKey = keyFromUrl || storedOwnerKey;
-  const isOwner = (currentKey && currentKey === gallery.owner_key);
+  // 오너 확인: URL 키나 로컬에 저장된 키가 일치하거나, 혹은 만약 키가 없더라도 DB owner_key와 로컬스토리지 소유 정보가 맞으면 오너 권한 부여
+  const isOwner = (currentKey && currentKey === gallery.owner_key) || (storedOwnerKey && storedOwnerKey === gallery.owner_key);
   const isMaster = isMasterAdmin();
   const canManage = isOwner || isMaster;
 
   const myVid = await getVisitorId();
   const savedName = localStorage.getItem('visitor-nickname') || '';
-  const savedCommentNick = localStorage.getItem('visitor-comment-nickname') || savedName || '';
   let currentSort = 'popular';
 
   APP.innerHTML = `
@@ -696,7 +698,7 @@ async function renderVisitor(id, keyFromUrl=null){
     <div class="card">
       <h2>✏️ 캔버스에 그림 그리기</h2>
       <div class="row" style="margin-bottom:8px;">
-        <input type="text" id="authorName" placeholder="내 닉네임 (선택)" value="${escapeHtml(savedName)}">
+        <input type="text" id="authorName" placeholder="내 닉네임 (선택)" value="${escapeHtml(savedName)}" style="flex:1; max-width:240px;">
       </div>
       <canvas id="draw"></canvas>
       ${brushControlsHtml()}
@@ -718,6 +720,14 @@ async function renderVisitor(id, keyFromUrl=null){
     <div id="subFeed" class="grid"><span class="small">불러오는 중...</span></div>
   `;
 
+  // 닉네임 입력란 값 변경 시 로컬스토리지에 실시간 반영하여 댓글에서도 사용
+  const authorInput = document.getElementById('authorName');
+  if(authorInput){
+    authorInput.oninput = (e)=>{
+      localStorage.setItem('visitor-nickname', e.target.value.trim());
+    };
+  }
+
   if(canManage){
     document.getElementById('saveSettingBtn').onclick = async ()=>{
       gallery.title = document.getElementById('galleryTitle').value.trim() || '나만의 갤러리';
@@ -730,11 +740,7 @@ async function renderVisitor(id, keyFromUrl=null){
     const delGBtn = document.getElementById('deleteGalleryBtn');
     if(delGBtn){
       delGBtn.onclick = async ()=>{
-        if(confirm('이 갤러리를 완전히 삭제하시겠습니까? (되돌릴 수 없습니다)')){
-          const subs = await loadSubs(id);
-          for(const s of subs){
-            await supabaseClient.from('comments').delete().eq('submission_id', s.id);
-          }
+        if(confirm('이 갤러리를 완전히 삭제하시겠습니까? 등록된 작품들과 댓글이 모두 삭제됩니다.')){
           await supabaseClient.from('submissions').delete().eq('gallery_id', id);
           await supabaseClient.from('gallery').delete().eq('id', id);
           alert('갤러리가 삭제되었습니다.');
@@ -759,6 +765,7 @@ async function renderVisitor(id, keyFromUrl=null){
     
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    saveState(canvas, id);
     msg.textContent = '그림 제출 완료! 🎉'; msg.className='msg ok';
     refreshFeed();
   };
@@ -835,10 +842,9 @@ async function renderVisitor(id, keyFromUrl=null){
                 }).join('')
               }
             </div>
-            <div class="row" style="gap:4px; margin-bottom:4px;">
-              <input type="text" placeholder="닉네임" class="commentAuthorInput" value="${escapeHtml(savedCommentNick)}" style="width:75px; font-size:11px; padding:4px 6px;">
-              <input type="text" placeholder="댓글 작성..." class="commentInput" style="font-size:11px; padding:4px 6px; flex:1;">
-              <button class="commentBtn" style="padding:4px 8px; font-size:11px;">등록</button>
+            <div class="row" style="gap:4px;">
+              <input type="text" placeholder="댓글을 입력하세요..." class="commentInput" style="font-size:11px; padding:6px 8px; flex:1;">
+              <button class="commentBtn" style="padding:6px 10px; font-size:11px;">등록</button>
             </div>
           </div>
         </div>
@@ -869,7 +875,7 @@ async function renderVisitor(id, keyFromUrl=null){
           gallery.cover_image = (gallery.cover_image === target.image) ? '' : target.image;
           const ok = await saveGallery(id, gallery);
           if(ok) refreshFeed();
-          else alert('썸네일 저장 실패! Supabase gallery 테이블을 확인해주세요.');
+          else alert('썸네일 저장 실패!');
         };
       }
 
@@ -901,14 +907,11 @@ async function renderVisitor(id, keyFromUrl=null){
       const commentBtn = card.querySelector('.commentBtn');
       if(commentBtn){
         commentBtn.onclick = async ()=>{
-          const authorInput = card.querySelector('.commentAuthorInput');
           const input = card.querySelector('.commentInput');
           const val = input.value.trim();
           if(!val) return;
-          const commentAuthor = authorInput.value.trim() || '익명';
-          localStorage.setItem('visitor-comment-nickname', commentAuthor);
-
-          await addComment(sid, commentAuthor, val);
+          const author = localStorage.getItem('visitor-nickname') || '익명';
+          await addComment(sid, author, val);
           input.value = '';
           refreshFeed();
         };
