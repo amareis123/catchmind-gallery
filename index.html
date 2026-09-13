@@ -76,7 +76,6 @@
   .modal-content img { max-width:100%; max-height:70vh; border-radius:8px; display:block; margin:0 auto; }
   .modal-close { position:absolute; top:8px; right:12px; background:none; border:none; font-size:24px; cursor:pointer; color:#333; }
 
-  /* 필터 스위치 UI */
   .filter-toggle { display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:bold; cursor:pointer; background:#fff; padding:4px 10px; border-radius:20px; border:1px solid var(--line); }
 </style>
 
@@ -107,7 +106,7 @@ let visitorId = null;
 
 let undoStack = [];
 let redoStack = [];
-const MAX_UNDO = 10;
+const MAX_UNDO = 100; // ✅ Undo/Redo 횟수 제한 확장 (10회 -> 100회)
 let currentActiveCanvas = null;
 let currentActiveGalleryId = null;
 
@@ -438,7 +437,6 @@ function getRgbaColor(hex, opacity){
   return `rgba(${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}, ${opacity})`;
 }
 
-// ✅ [버그 수정] 새로고침 없이 바로 그려도 전체 삭제되지 않도록 Undo 히스토리 보존
 function saveState(canvas, galleryId){
   const ctx = canvas.getContext('2d');
   if(undoStack.length >= MAX_UNDO) undoStack.shift();
@@ -449,8 +447,9 @@ function saveState(canvas, galleryId){
   }
 }
 
+// ✅ [버그 수정] 최초 흰 바탕 상태를 보존하고 전체 삭제를 방지하는 Undo 로직
 function undo(canvas, galleryId){
-  if(undoStack.length <= 1) return; // 베이스 상태를 보호
+  if(undoStack.length <= 1) return; // 초기 베이스 스냅샷 유지
   const ctx = canvas.getContext('2d');
   redoStack.push(undoStack.pop());
   const prevState = undoStack[undoStack.length - 1];
@@ -506,7 +505,7 @@ function floodFill(canvas, startX, startY, fillColorRgba){
   ctx.putImageData(imgData, 0, 0);
 }
 
-// ✅ 캔버스 마운트 시 최초 빈 상태를 스냅샷으로 강제 push하여 새로고침 없는 첫 작성 완벽 지원
+// ✅ [버그 수정] 초기 접속 시 배경을 흰색으로 명확하게 칠한 후 스냅샷을 찍어 즉시 Undo 오류 방지
 function setupCanvas(canvas, galleryId){
   currentActiveCanvas = canvas;
   currentActiveGalleryId = galleryId;
@@ -514,6 +513,10 @@ function setupCanvas(canvas, galleryId){
   canvas.width = 480; canvas.height = 360;
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   undoStack = []; redoStack = [];
+
+  // 1. 기본 배경 렌더링
+  ctx.fillStyle = '#ffffff'; 
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   const savedDraft = localStorage.getItem(`draft-canvas-${galleryId}`);
   if(savedDraft){
@@ -524,9 +527,7 @@ function setupCanvas(canvas, galleryId){
     };
     img.src = savedDraft;
   } else { 
-    ctx.fillStyle = '#ffffff'; 
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    saveState(canvas, galleryId); // 필수 스냅샷
+    saveState(canvas, galleryId); // 초기 흰 바탕 상태를 스냅샷 1번으로 보관
   }
 
   let last = null;
@@ -676,8 +677,6 @@ async function renderVisitor(id, keyFromUrl=null){
   const isBanned = (gallery.banned_visitors || []).includes(myVid);
   const savedName = localStorage.getItem('visitor-nickname') || '';
   let currentSort = 'popular';
-  
-  // ✅ 비공개 그림 보기 ON/OFF 필터 상태 (기본값: OFF)
   let showPrivateFilter = false;
 
   APP.innerHTML = `
@@ -739,7 +738,6 @@ async function renderVisitor(id, keyFromUrl=null){
     <div id="subFeed" class="grid"><span class="small">불러오는 중...</span></div>
   `;
 
-  // 비공개 필터 토글 이벤트 바인딩
   const filterToggle = document.getElementById('privateFilterToggle');
   if(filterToggle){
     filterToggle.onchange = (e) => {
@@ -781,21 +779,18 @@ async function renderVisitor(id, keyFromUrl=null){
   setupCanvas(canvas, id);
   bindBrushControls(document, id);
 
-  // ✅ [도배 방지 & 밴 검사] 작품 제출 처리
   document.getElementById('submitBtn').onclick = async ()=>{
     const submitBtn = document.getElementById('submitBtn');
     const msg = document.getElementById('submitMsg');
     
-    // 밴 사용자 재차단
     if(isBanned){
       msg.textContent = '차단된 사용자는 업로드할 수 없습니다.'; msg.className = 'msg no';
       return;
     }
 
-    // 쿨타임(10초) 검사
     const lastUpload = parseInt(localStorage.getItem(`last-upload-${id}`) || '0');
     const now = Date.now();
-    const cooldown = 10000; // 10초
+    const cooldown = 10000;
 
     if (now - lastUpload < cooldown) {
       const remainSec = Math.ceil((cooldown - (now - lastUpload)) / 1000);
@@ -807,7 +802,8 @@ async function renderVisitor(id, keyFromUrl=null){
     submitBtn.disabled = true;
     msg.textContent = '업로드 중...'; msg.className = 'msg';
 
-    const image = canvas.toDataURL('image/jpeg', 0.7);
+    // ✅ [색감 변형 해결] JPEG 대신 Alpha 채널과 투명도를 손실 없이 인코딩하는 PNG로 변경
+    const image = canvas.toDataURL('image/png');
     const author = document.getElementById('authorName').value.trim() || '익명';
     localStorage.setItem('visitor-nickname', author);
 
@@ -815,7 +811,7 @@ async function renderVisitor(id, keyFromUrl=null){
     submitBtn.disabled = false;
 
     if(ok){
-      localStorage.setItem(`last-upload-${id}`, Date.now()); // 마지막 업로드 시간 갱신
+      localStorage.setItem(`last-upload-${id}`, Date.now());
       localStorage.removeItem(`draft-canvas-${id}`);
       
       const ctx = canvas.getContext('2d');
@@ -833,13 +829,11 @@ async function renderVisitor(id, keyFromUrl=null){
     refreshFeed();
   };
 
-  // ✅ 비공개 그림 필터 및 밴 관리 액션 포함 목록 리프레시
   async function refreshFeed(){
     if(document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
 
     let subs = await loadSubs(id);
 
-    // ✅ 관리자/오너 필터 제어 (토글 필터가 꺼져있거나 권한이 없으면 비공개(hidden) 그림 숨김)
     if(!canManage || !showPrivateFilter) {
       subs = subs.filter(s=>!s.hidden); 
     }
@@ -932,7 +926,6 @@ async function renderVisitor(id, keyFromUrl=null){
         refreshFeed();
       };
 
-      // ✅ 관리자/갤러리 주인 밴 토글 기능 처리
       const banBtn = card.querySelector('.banUserBtn');
       if(banBtn){
         banBtn.onclick = async ()=>{
