@@ -3,15 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>낙서 갤러리 - 캐치마인드 Pro</title>
+<title>낙서 갤러리 Pro</title>
 <style>
   :root{
     --bg:#fef6e4; --card:#ffffff; --ink:#26251f; --accent:#f582ae; --accent2:#8bd3dd;
-    --accent3:#f3d2c1; --line:#e6dfd3; --good:#3aa655; --bad:#d9534f;
+    --line:#e6dfd3; --good:#3aa655; --bad:#d9534f;
   }
   * { box-sizing: border-box; }
   body { margin:0; font-family: 'Malgun Gothic', -apple-system, sans-serif; background: var(--bg); color: var(--ink); min-height:100vh; }
-  #app { max-width: 720px; margin: 0 auto; padding: 20px 16px 60px; }
+  #app { max-width: 760px; margin: 0 auto; padding: 20px 16px 60px; }
   h1 { font-size: 22px; margin: 6px 0 4px; }
   h2 { font-size: 17px; margin: 18px 0 8px; }
   p.sub { color:#6b6a63; font-size: 13px; margin-top:0; }
@@ -21,35 +21,44 @@
   button.ghost { background: #eee; color: #444; }
   button.danger { background: var(--bad); color: #fff; }
   button:disabled { opacity: 0.5; cursor: not-allowed; }
-  input[type=text] { font-family: inherit; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line); font-size: 14px; width: 100%; }
+  input[type=text], select { font-family: inherit; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line); font-size: 14px; }
   .row { display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
-  .link-box { display:flex; gap:6px; }
+  .link-box { display:flex; gap:6px; margin-top:4px; }
   .link-box input { flex:1; background:#f6f3ea; }
   canvas { border-radius: 10px; border: 2px solid var(--line); background:#fff; touch-action: none; width:100%; max-width:480px; height:auto; display:block; cursor: crosshair; }
   .swatch { width:24px; height:24px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1px var(--line); cursor:pointer; display:inline-block; }
   .swatch.active { box-shadow: 0 0 0 2px var(--ink); transform: scale(1.1); }
   .badge { display:inline-block; font-size:11px; padding:2px 8px; border-radius:20px; font-weight:700; }
-  .badge.correct { background:#d9f3df; color: var(--good); }
-  .badge.pending { background:#fff2d6; color:#a3760c; }
   .badge.pinned { background:#ffe3ec; color:var(--accent); }
   .badge.hidden { background:#e2e2e2; color:#666; }
-  .badge.banned { background:#ffdce0; color:var(--bad); }
+  .badge.private { background:#eee; color:#666; }
+  .badge.public { background:#d9f3df; color:var(--good); }
   .grid { display:flex; flex-wrap:wrap; gap:12px; }
-  .thumb-card { width: 160px; background:#fbfaf5; border:1px solid var(--line); border-radius:10px; padding:8px; font-size:12px; position:relative; }
+  
+  /* 갤러리 피드 카드 */
+  .gallery-card { width: 220px; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; cursor:pointer; transition:transform 0.1s; }
+  .gallery-card:hover { transform:translateY(-2px); }
+  .gallery-card .cover { width:100%; height:140px; border-radius:8px; background:#f6f3ea; object-fit:cover; display:flex; align-items:center; justify-content:center; color:#888; font-size:12px; }
+
+  /* 그림 카드 */
+  .thumb-card { width: 220px; background:#fbfaf5; border:1px solid var(--line); border-radius:10px; padding:10px; font-size:12px; position:relative; }
   .thumb-card.pinned-card { border: 2px solid var(--accent); background:#fff0f5; }
-  .thumb-card img { width:100%; border-radius:6px; display:block; margin-bottom:6px; background:#fff; cursor:pointer; transition:transform 0.1s; }
-  .thumb-card img:hover { transform: scale(1.02); }
-  .like-btn { background:#fff0f5; color:var(--accent); font-size:12px; padding:4px 10px; margin-top:4px; border-radius:6px; }
+  .thumb-card img { width:100%; border-radius:6px; display:block; margin-bottom:6px; background:#fff; cursor:pointer; }
+  .like-btn { background:#fff0f5; color:var(--accent); font-size:12px; padding:4px 10px; margin-top:4px; border-radius:6px; width:100%; }
   .admin-actions { display:flex; gap:4px; margin-top:6px; flex-wrap:wrap; }
   .admin-actions button { font-size:10px; padding:3px 6px; border-radius:6px; }
-  .mode-btn { padding:8px 14px; border-radius:10px; font-size:13px; }
-  .mode-btn.off { background:#eee; color:#666; }
+  
+  /* 댓글 섹션 */
+  .comment-section { margin-top:8px; border-top:1px dashed var(--line); padding-top:6px; }
+  .comment-list { max-height:100px; overflow-y:auto; margin-bottom:6px; }
+  .comment-item { background:#fff; padding:4px 6px; border-radius:4px; margin-bottom:4px; font-size:11px; }
+  .comment-item .c-author { font-weight:bold; color:#444; }
+
   .tool-btn { padding:6px 12px; font-size:12px; background:#eee; color:#333; }
   .tool-btn.active { background:var(--ink); color:#fff; }
   .topbar { display:flex; justify-content:space-between; align-items:center; }
   .small { font-size:12px; color:#8a887d; }
   .author { font-weight:bold; color:#444; margin-bottom:4px; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .guess-row { display:flex; gap:6px; margin-top:8px; }
   .msg { font-size:12px; margin-top:4px; }
   .msg.ok { color: var(--good); } .msg.no { color: var(--bad); }
   a.home-link { color:#8a887d; font-size:12px; text-decoration:none; }
@@ -66,7 +75,6 @@
   .color-picker-btn { width:26px; height:26px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1px var(--line); display:inline-block; background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red); }
 </style>
 
-<!-- Supabase SDK -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -83,7 +91,7 @@
 
 <script>
 const SUPABASE_URL = "https://usxaesuezcagnjrhngqt.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzeGFlc3VlemNhZ25qcmhuZ3F0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyMTQ3NTgsImV4cCI6MjEwNDc5MDc1OH0.RSY-kBFmTDx72VkjuwlaT9_5sF1szG6OV2QoluFUdR0";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInRefiI6InVzeGFlc3VlemNhZ25qcmhuZ3F0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyMTQ3NTgsImV4cCI6MjEwNDc5MDc1OH0.RSY-kBFmTDx72VkjuwlaT9_5sF1szG6OV2QoluFUdR0";
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -93,14 +101,11 @@ let currentBrush = { color:'#26251f', opacity: 1.0, size:4, tool:'brush' };
 let drawing = false;
 let visitorId = null;
 
-// [최적화] ImageData를 담는 메모리 효율적인 Undo / Redo 스택
 let undoStack = [];
 let redoStack = [];
 const MAX_UNDO = 15;
 
-function escapeHtml(s){
-  const d = document.createElement('div'); d.innerText = s == null ? '' : String(s); return d.innerHTML;
-}
+function escapeHtml(s){ const d = document.createElement('div'); d.innerText = s == null ? '' : String(s); return d.innerHTML; }
 function genId(len){
   const chars = 'abcdefghijkmnopqrstuvwxyz23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
   let s=''; for(let i=0;i<(len||8);i++) s += chars[Math.floor(Math.random()*chars.length)];
@@ -113,32 +118,24 @@ function openModal(imgSrc, caption){
   document.getElementById('modalCaption').innerText = caption || '';
   document.getElementById('imgModal').classList.add('active');
 }
-function closeModal(){
-  document.getElementById('imgModal').classList.remove('active');
-}
+function closeModal(){ document.getElementById('imgModal').classList.remove('active'); }
 
 function getRgbaColor(hex, opacity){
   let c = hex.replace('#','');
   if(c.length === 3) c = c.split('').map(x=>x+x).join('');
   const num = parseInt(c, 16);
-  const r = (num >> 16) & 255;
-  const g = (num >> 8) & 255;
-  const b = num & 255;
-  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+  return `rgba(${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}, ${opacity})`;
 }
 
 async function getVisitorId(){
   if(visitorId) return visitorId;
   let stored = localStorage.getItem('visitor-id');
-  if(!stored){
-    stored = genId(12);
-    localStorage.setItem('visitor-id', stored);
-  }
+  if(!stored){ stored = genId(12); localStorage.setItem('visitor-id', stored); }
   visitorId = stored;
   return visitorId;
 }
 
-// ---------------- Supabase 연동 ----------------
+// ---------------- Supabase API 연동 ----------------
 async function loadGallery(id){
   try {
     const { data, error } = await supabaseClient.from('gallery').select('*').eq('id', id).single();
@@ -152,7 +149,9 @@ async function saveGallery(id, obj){
     const { error } = await supabaseClient.from('gallery').upsert({
       id: id,
       owner_key: obj.owner_key,
-      mode: obj.mode,
+      title: obj.title || '나만의 갤러리',
+      is_public: obj.is_public !== undefined ? obj.is_public : true,
+      cover_image: obj.cover_image || '',
       topic: obj.topic || '',
       banned_visitors: obj.banned_visitors || []
     });
@@ -160,14 +159,29 @@ async function saveGallery(id, obj){
   } catch(e){ return false; }
 }
 
+async function deleteGallery(id){
+  try {
+    await supabaseClient.from('submissions').delete().eq('gallery_id', id);
+    const { error } = await supabaseClient.from('gallery').delete().eq('id', id);
+    return !error;
+  } catch(e){ return false; }
+}
+
+async function loadPublicGalleries(query=''){
+  try {
+    let q = supabaseClient.from('gallery').select('*').eq('is_public', true);
+    if(query) q = q.ilike('title', `%${query}%`);
+    const { data, error } = await q;
+    if(error) return [];
+    return data;
+  } catch(e){ return []; }
+}
+
 async function loadSubs(id){
   try {
-    const { data, error } = await supabaseClient.from('submissions').select('*').eq('gallery_id', id).order('created_at', { ascending: true });
+    const { data, error } = await supabaseClient.from('submissions').select('*').eq('gallery_id', id).order('created_at', { ascending: false });
     if(error) return [];
-    return data.map(item => ({
-      ...item,
-      likedBy: item.liked_by || []
-    }));
+    return data.map(item => ({ ...item, likedBy: item.liked_by || [] }));
   } catch(e){ return []; }
 }
 
@@ -178,13 +192,11 @@ async function addSub(id, item){
       id: item.id,
       gallery_id: id,
       author: item.author,
-      topic: item.topic || '',
       image: item.image,
-      correct: item.correct || false,
-      pinned: item.pinned || false,
-      hidden: item.hidden || false,
-      likes: item.likes || 0,
-      liked_by: item.likedBy || [],
+      pinned: false,
+      hidden: false,
+      likes: 0,
+      liked_by: [],
       visitor_id: vId
     });
     return !error;
@@ -194,7 +206,6 @@ async function addSub(id, item){
 async function updateSub(item){
   try {
     const { error } = await supabaseClient.from('submissions').update({
-      correct: item.correct,
       pinned: item.pinned,
       hidden: item.hidden,
       likes: item.likes,
@@ -206,9 +217,44 @@ async function updateSub(item){
 
 async function deleteSub(sid){
   try {
+    await supabaseClient.from('comments').delete().eq('submission_id', sid);
     const { error } = await supabaseClient.from('submissions').delete().eq('id', sid);
     return !error;
   } catch(e){ return false; }
+}
+
+// 댓글 API
+async function loadComments(subId){
+  try {
+    const { data, error } = await supabaseClient.from('comments').select('*').eq('submission_id', subId).order('created_at', { ascending: true });
+    if(error) return [];
+    return data;
+  } catch(e){ return []; }
+}
+
+async function addComment(subId, author, content){
+  try {
+    const { error } = await supabaseClient.from('comments').insert({
+      id: genId(10),
+      submission_id: subId,
+      author,
+      content
+    });
+    return !error;
+  } catch(e){ return false; }
+}
+
+// 대표 이미지 계산 (수동 지정 -> 인기 1위 -> 최신 1위)
+function getCoverImage(gallery, subs){
+  if(gallery.cover_image) return gallery.cover_image;
+  const visibleSubs = subs.filter(s=>!s.hidden);
+  if(visibleSubs.length === 0) return null;
+  
+  const sorted = visibleSubs.slice().sort((a,b)=>{
+    if((b.likes||0) !== (a.likes||0)) return (b.likes||0) - (a.likes||0);
+    return new Date(b.created_at) - new Date(a.created_at);
+  });
+  return sorted[0].image;
 }
 
 // ---------------- 라우터 ----------------
@@ -224,28 +270,45 @@ function route(){
 }
 addEventListener('hashchange', route);
 
-// ---------------- 홈 ----------------
+// ---------------- 메인 홈 ----------------
 async function renderHome(){
   APP.innerHTML = `
     <h1>🎨 낙서 갤러리 Pro</h1>
-    <p class="sub">나만의 보안 갤러리를 만들고 링크를 공유해보세요.</p>
+    <p class="sub">나만의 갤러리를 개설하거나 공개된 갤러리의 그림들을 감상해보세요.</p>
+    
     <div class="card">
-      <h2>어떻게 작동하나요?</h2>
-      <p class="small">① 갤러리를 만들면 비밀 번호가 포함된 **관리자 링크**와 공유용 **방문자 링크**가 생깁니다.<br>
-      ② 방문자는 자유롭게 캔버스에 그림을 그리고, **실행 취소/투명도/필압 감지/페인트 채우기**를 지원합니다.<br>
-      ③ **도배 방지 시스템**과 **악성 유저 차단(밴) 기능**으로 안전하게 운영하세요.</p>
-      <button id="createBtn">✏️ 내 갤러리 만들기</button>
+      <h2>✨ 새 갤러리 만들기</h2>
+      <div class="row" style="margin-bottom:10px;">
+        <input type="text" id="newTitle" placeholder="갤러리 이름 입력" style="flex:1;">
+        <select id="newPublic">
+          <option value="true">🌐 공개 갤러리</option>
+          <option value="false">🔒 비공개 (링크 전용)</option>
+        </select>
+      </div>
+      <button id="createBtn">✏️ 갤러리 생성</button>
     </div>
+
     <div id="myGalleryBox"></div>
+
+    <div class="card">
+      <h2>🔍 공개 갤러리 둘러보기</h2>
+      <div class="row" style="margin-bottom:14px;">
+        <input type="text" id="searchInput" placeholder="갤러리 이름 검색..." style="flex:1;">
+        <button class="secondary" id="searchBtn">검색</button>
+      </div>
+      <div id="publicGrid" class="grid"><span class="small">갤러리를 불러오는 중...</span></div>
+    </div>
   `;
+
   document.getElementById('createBtn').onclick = async ()=>{
+    const title = document.getElementById('newTitle').value.trim() || '나만의 갤러리';
+    const isPublic = document.getElementById('newPublic').value === 'true';
     const id = genId(8);
     const ownerKey = genId(16);
-    await saveGallery(id, { owner_key: ownerKey, mode:'catchmind', topic:'', banned_visitors:[] });
     
+    await saveGallery(id, { owner_key: ownerKey, title, is_public: isPublic, topic:'', banned_visitors:[] });
     localStorage.setItem('my-gallery-id', id);
     localStorage.setItem('my-gallery-key', ownerKey);
-    
     location.hash = `owner=${id}&key=${ownerKey}`;
   };
 
@@ -253,33 +316,66 @@ async function renderHome(){
   const savedKey = localStorage.getItem('my-gallery-key');
   if(savedId && savedKey){
     const box = document.getElementById('myGalleryBox');
-    box.innerHTML = `<div class="card"><span class="small">이전에 만든 갤러리가 있어요.</span><br><button class="secondary" id="goMine" style="margin-top:6px;">내 갤러리로 이동</button></div>`;
+    box.innerHTML = `<div class="card"><span class="small">내가 관리 중인 갤러리가 있습니다.</span><br><button class="secondary" id="goMine" style="margin-top:6px;">내 갤러리로 이동</button></div>`;
     document.getElementById('goMine').onclick = ()=>{ location.hash = `owner=${savedId}&key=${savedKey}`; };
   }
+
+  async function loadGalleries(q=''){
+    const grid = document.getElementById('publicGrid');
+    const galleries = await loadPublicGalleries(q);
+    if(galleries.length === 0){
+      grid.innerHTML = '<span class="small">공개된 갤러리가 없습니다.</span>';
+      return;
+    }
+
+    let html = '';
+    for(const g of galleries){
+      const subs = await loadSubs(g.id);
+      const cover = getCoverImage(g, subs);
+      html += `
+        <div class="gallery-card" onclick="location.hash='visit=${g.id}'">
+          ${cover ? `<img class="cover" src="${cover}">` : `<div class="cover">🎨 그림이 없습니다</div>`}
+          <div style="margin-top:8px; font-weight:bold; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(g.title)}</div>
+          <div class="small" style="margin-top:2px;">작품 ${subs.filter(s=>!s.hidden).length}개</div>
+        </div>
+      `;
+    }
+    grid.innerHTML = html;
+  }
+
+  document.getElementById('searchBtn').onclick = ()=>{ loadGalleries(document.getElementById('searchInput').value.trim()); };
+  loadGalleries();
 }
 
-// ---------------- [최적화된] 캔버스 엔진 ----------------
-function saveState(canvas){
+// ---------------- 캔버스 엔진 (자동 임시저장 지원) ----------------
+function saveState(canvas, galleryId){
   const ctx = canvas.getContext('2d');
   if(undoStack.length >= MAX_UNDO) undoStack.shift();
   undoStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
   redoStack = [];
+
+  // [기능 추가] 획 변경 시 localStorage에 그림 자동 임시저장
+  if(galleryId){
+    localStorage.setItem(`draft-canvas-${galleryId}`, canvas.toDataURL());
+  }
 }
 
-function undo(canvas){
-  if(undoStack.length <= 1) return; // 하얀 백그라운드 보존
+function undo(canvas, galleryId){
+  if(undoStack.length <= 1) return;
   const ctx = canvas.getContext('2d');
   redoStack.push(undoStack.pop());
   const prevState = undoStack[undoStack.length - 1];
   ctx.putImageData(prevState, 0, 0);
+  if(galleryId) localStorage.setItem(`draft-canvas-${galleryId}`, canvas.toDataURL());
 }
 
-function redo(canvas){
+function redo(canvas, galleryId){
   if(redoStack.length === 0) return;
   const ctx = canvas.getContext('2d');
   const nextState = redoStack.pop();
   undoStack.push(nextState);
   ctx.putImageData(nextState, 0, 0);
+  if(galleryId) localStorage.setItem(`draft-canvas-${galleryId}`, canvas.toDataURL());
 }
 
 function floodFill(canvas, startX, startY, fillColorRgba){
@@ -294,33 +390,24 @@ function floodFill(canvas, startX, startY, fillColorRgba){
   document.body.removeChild(temp);
   
   const fillR = cs[0], fillG = cs[1], fillB = cs[2], fillA = Math.round((cs[3] !== undefined ? cs[3] : 1) * 255);
-
   const targetIdx = (Math.floor(startY) * canvas.width + Math.floor(startX)) * 4;
   const startR = data[targetIdx], startG = data[targetIdx+1], startB = data[targetIdx+2], startA = data[targetIdx+3];
 
   if(Math.abs(startR - fillR) < 5 && Math.abs(startG - fillG) < 5 && Math.abs(startB - fillB) < 5 && Math.abs(startA - fillA) < 5) return;
 
   function matchColor(idx){
-    return Math.abs(data[idx] - startR) < 32 &&
-           Math.abs(data[idx+1] - startG) < 32 &&
-           Math.abs(data[idx+2] - startB) < 32 &&
-           Math.abs(data[idx+3] - startA) < 32;
+    return Math.abs(data[idx] - startR) < 32 && Math.abs(data[idx+1] - startG) < 32 &&
+           Math.abs(data[idx+2] - startB) < 32 && Math.abs(data[idx+3] - startA) < 32;
   }
 
   const queue = [[Math.floor(startX), Math.floor(startY)]];
-  const width = canvas.width;
-  const height = canvas.height;
+  const width = canvas.width, height = canvas.height;
 
   while(queue.length > 0){
     const [x, y] = queue.pop();
     const idx = (y * width + x) * 4;
-
     if(matchColor(idx)){
-      data[idx] = fillR;
-      data[idx+1] = fillG;
-      data[idx+2] = fillB;
-      data[idx+3] = fillA;
-
+      data[idx] = fillR; data[idx+1] = fillG; data[idx+2] = fillB; data[idx+3] = fillA;
       if(x > 0) queue.push([x - 1, y]);
       if(x < width - 1) queue.push([x + 1, y]);
       if(y > 0) queue.push([x, y - 1]);
@@ -330,26 +417,35 @@ function floodFill(canvas, startX, startY, fillColorRgba){
   ctx.putImageData(imgData, 0, 0);
 }
 
-function setupCanvas(canvas){
+function setupCanvas(canvas, galleryId){
   const ctx = canvas.getContext('2d');
   canvas.width = 480; canvas.height = 360;
   ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height);
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   
   undoStack = []; redoStack = [];
-  saveState(canvas);
+
+  // [임시 저장 복구]
+  const savedDraft = localStorage.getItem(`draft-canvas-${galleryId}`);
+  if(savedDraft){
+    const img = new Image();
+    img.onload = ()=>{
+      ctx.drawImage(img, 0, 0);
+      saveState(canvas, galleryId);
+    };
+    img.src = savedDraft;
+  } else {
+    saveState(canvas, galleryId);
+  }
 
   let last = null;
   let isFramePending = false;
 
   function pos(e){
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
     return { 
-      x: (e.clientX - rect.left) * scaleX, 
-      y: (e.clientY - rect.top) * scaleY,
-      pressure: (e.pressure && e.pressure > 0 && e.pointerType === 'pen') ? e.pressure : 0.5
+      x: (e.clientX - rect.left) * (canvas.width / rect.width), 
+      y: (e.clientY - rect.top) * (canvas.height / rect.height)
     };
   }
 
@@ -360,12 +456,10 @@ function setupCanvas(canvas){
 
     if(currentBrush.tool === 'fill'){
       floodFill(canvas, p.x, p.y, activeColor);
-      saveState(canvas);
+      saveState(canvas, galleryId);
       return;
     }
-
-    drawing = true;
-    last = p;
+    drawing = true; last = p;
   }
 
   function move(e){
@@ -373,35 +467,22 @@ function setupCanvas(canvas){
     e.preventDefault();
     const p = pos(e);
 
-    // [최적화] 렌더링 프레임 단위 동기화 (RequestAnimationFrame)
     if(!isFramePending){
       isFramePending = true;
       requestAnimationFrame(()=>{
-        const activeColor = getRgbaColor(currentBrush.color, currentBrush.opacity);
-        ctx.strokeStyle = activeColor;
-        
+        ctx.strokeStyle = getRgbaColor(currentBrush.color, currentBrush.opacity);
         let calculatedWidth = currentBrush.size;
-        if (e.pointerType === 'pen' && e.pressure > 0) {
-          calculatedWidth = currentBrush.size * (e.pressure * 2); 
-        }
+        if (e.pointerType === 'pen' && e.pressure > 0) calculatedWidth = currentBrush.size * (e.pressure * 2); 
         ctx.lineWidth = Math.max(0.5, calculatedWidth);
 
-        ctx.beginPath(); 
-        ctx.moveTo(last.x, last.y); 
-        ctx.lineTo(p.x, p.y); 
-        ctx.stroke();
-        
-        last = p;
-        isFramePending = false;
+        ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+        last = p; isFramePending = false;
       });
     }
   }
 
   function end(){
-    if(drawing){
-      drawing = false;
-      saveState(canvas); // 획 작성이 완료되었을 때만 1회 상태 저장
-    }
+    if(drawing){ drawing = false; saveState(canvas, galleryId); }
   }
 
   canvas.addEventListener('pointerdown', start);
@@ -409,22 +490,14 @@ function setupCanvas(canvas){
   window.addEventListener('pointerup', end);
   window.addEventListener('pointercancel', end);
 
-  window.onkeydown = (e)=>{
-    if(e.ctrlKey || e.metaKey){
-      if(e.key.toLowerCase() === 'z'){
-        if(e.shiftKey) redo(canvas); else undo(canvas);
-      } else if(e.key.toLowerCase() === 'y'){
-        redo(canvas);
-      }
-    }
-  };
   return ctx;
 }
 
-function clearCanvas(canvas){
+function clearCanvas(canvas, galleryId){
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height);
-  saveState(canvas);
+  if(galleryId) localStorage.removeItem(`draft-canvas-${galleryId}`);
+  saveState(canvas, galleryId);
 }
 
 function brushControlsHtml(){
@@ -435,7 +508,7 @@ function brushControlsHtml(){
       <button type="button" class="tool-btn" id="toolFill">🪣 채우기</button>
       <div style="border-left:1px solid #ccc; height:20px; margin:0 4px;"></div>
       ${colors.map(c=>`<span class="swatch" data-color="${c}" style="background:${c}; ${c==='#ffffff'?'box-shadow:0 0 0 1px #ccc;':''}"></span>`).join('')}
-      <div class="color-picker-wrapper" title="더 많은 색상 선택">
+      <div class="color-picker-wrapper" title="색상 커스텀">
         <span class="color-picker-btn"></span>
         <input type="color" id="customColor" value="#26251f">
       </div>
@@ -444,9 +517,7 @@ function brushControlsHtml(){
       <span class="small">굵기:</span>
       <input type="range" min="1" max="50" value="4" id="brushSize" style="width:70px;">
       <span class="small" id="brushSizeVal">4px</span>
-      
       <div style="border-left:1px solid #ccc; height:16px; margin:0 4px;"></div>
-      
       <span class="small">투명도:</span>
       <input type="range" min="5" max="100" value="100" id="brushOpacity" style="width:70px;">
       <span class="small" id="brushOpacityVal">100%</span>
@@ -458,7 +529,7 @@ function brushControlsHtml(){
     </div>`;
 }
 
-function bindBrushControls(scope){
+function bindBrushControls(scope, galleryId){
   const canvas = scope.querySelector('canvas');
   scope.querySelectorAll('.swatch').forEach(s=>{
     s.onclick = ()=>{ 
@@ -483,102 +554,121 @@ function bindBrushControls(scope){
     tFill.onclick = ()=>{ currentBrush.tool='fill'; tFill.classList.add('active'); tBrush.classList.remove('active'); };
   }
 
-  const bSize = scope.querySelector('#brushSize');
-  const bSizeVal = scope.querySelector('#brushSizeVal');
-  bSize.oninput = (e)=>{ 
+  scope.querySelector('#brushSize').oninput = (e)=>{ 
     currentBrush.size = parseInt(e.target.value); 
-    bSizeVal.textContent = `${currentBrush.size}px`;
+    scope.querySelector('#brushSizeVal').textContent = `${currentBrush.size}px`;
   };
 
-  const bOpacity = scope.querySelector('#brushOpacity');
-  const bOpacityVal = scope.querySelector('#brushOpacityVal');
-  bOpacity.oninput = (e)=>{
+  scope.querySelector('#brushOpacity').oninput = (e)=>{
     const val = parseInt(e.target.value);
     currentBrush.opacity = val / 100;
-    bOpacityVal.textContent = `${val}%`;
+    scope.querySelector('#brushOpacityVal').textContent = `${val}%`;
   };
 
-  scope.querySelector('#undoBtn').onclick = ()=> undo(canvas);
-  scope.querySelector('#redoBtn').onclick = ()=> redo(canvas);
-  scope.querySelector('#clearBtn').onclick = ()=> clearCanvas(canvas);
+  scope.querySelector('#undoBtn').onclick = ()=> undo(canvas, galleryId);
+  scope.querySelector('#redoBtn').onclick = ()=> redo(canvas, galleryId);
+  scope.querySelector('#clearBtn').onclick = ()=> clearCanvas(canvas, galleryId);
 }
 
-// ---------------- 주인(관리자) 화면 ----------------
+// ---------------- 관리자 화면 ----------------
 async function renderOwner(id, key){
   const gallery = await loadGallery(id);
   if(!gallery || gallery.owner_key !== key){
-    APP.innerHTML = `<div class="card">접근 권한이 없거나 존재하지 않는 관리자 링크입니다. <a class="home-link" href="#">홈으로</a></div>`;
+    APP.innerHTML = `<div class="card">접근 권한이 없습니다. <a class="home-link" href="#">홈으로</a></div>`;
     return;
   }
 
+  let currentSort = 'popular';
   const visitLink = baseUrl() + '#visit=' + id;
   const ownerLink = baseUrl() + `#owner=${id}&key=${key}`;
-  
+
   APP.innerHTML = `
-    <div class="topbar"><h1>🖼️ 내 갤러리 관리</h1><a class="home-link" href="#">홈</a></div>
+    <div class="topbar">
+      <h1>🖼️ 갤러리 관리자 페이지</h1>
+      <a class="home-link" href="#">홈으로</a>
+    </div>
     <div class="card">
-      <div class="small">🔒 주인 비밀 관리자 링크 (절대 공유 금지)</div>
+      <div class="row" style="justify-content:space-between; margin-bottom:8px;">
+        <h2 style="margin:0;">⚙️ 갤러리 설정</h2>
+        <button class="danger" id="deleteGalleryBtn" style="padding:4px 10px; font-size:12px;">🚨 갤러리 삭제</button>
+      </div>
+      <div class="row" style="margin-bottom:8px;">
+        <input type="text" id="galleryTitle" value="${escapeHtml(gallery.title)}" placeholder="갤러리 이름" style="flex:1;">
+        <select id="galleryPublic">
+          <option value="true" ${gallery.is_public?'selected':''}>🌐 공개</option>
+          <option value="false" ${!gallery.is_public?'selected':''}>🔒 비공개</option>
+        </select>
+        <button id="saveSettingBtn">저장</button>
+      </div>
+      <div class="small">🔒 비밀 관리자 링크 (공개 금지)</div>
       <div class="link-box"><input type="text" readonly value="${ownerLink}"></div>
-      <div class="small" style="margin-top:10px;">📎 방문자 공유 링크</div>
+      <div class="small" style="margin-top:6px;">📎 방문자 공유 링크</div>
       <div class="link-box"><input type="text" readonly value="${visitLink}"><button class="secondary" id="copyBtn">복사</button></div>
     </div>
-    <div class="card">
-      <h2>모드 선택</h2>
-      <div class="row">
-        <button class="mode-btn ${gallery.mode==='catchmind'?'':'off'}" id="modeCatch">🕵️ 캐치마인드 모드</button>
-        <button class="mode-btn ${gallery.mode==='topic'?'':'off'}" id="modeTopic">🎯 주제 모드</button>
-      </div>
-      <div id="topicSetter" style="margin-top:10px; ${gallery.mode==='topic'?'':'display:none;'}">
-        <div class="row">
-          <input type="text" id="topicInput" placeholder="오늘의 주제를 입력하세요" value="${escapeHtml(gallery.topic||'')}">
-          <button id="setTopicBtn">주제 설정</button>
-        </div>
-        <div class="small" style="margin-top:6px;">현재 주제: <b>${gallery.topic ? escapeHtml(gallery.topic) : '(아직 없음)'}</b></div>
-      </div>
+
+    <div class="row" style="justify-content:space-between; margin:16px 0 8px;">
+      <h2>방문자들의 작품 관리</h2>
+      <select id="sortSelect">
+        <option value="popular">🔥 인기순</option>
+        <option value="newest">✨ 최신순</option>
+        <option value="oldest">⏳ 오래된순</option>
+      </select>
     </div>
-    
-    <h2>${gallery.mode==='catchmind' ? '방문자들의 그림 — 주제를 맞혀보세요' : '방문자들의 작품'}</h2>
+
     <div id="subFeed" class="grid"><span class="small">불러오는 중...</span></div>
 
     <div class="card" style="margin-top:20px;">
-      <h2>🚫 밴 목록 관리 (차단된 유저)</h2>
+      <h2>🚫 차단된 유저 (밴 목록)</h2>
       <div id="bannedList" class="small">차단된 유저가 없습니다.</div>
     </div>
   `;
 
   document.getElementById('copyBtn').onclick = ()=>{
-    navigator.clipboard.writeText(visitLink).then(()=>alert('방문자 링크가 복사됐어요!')).catch(()=>{});
+    navigator.clipboard.writeText(visitLink).then(()=>alert('방문자 링크가 복사되었습니다!'));
   };
-  document.getElementById('modeCatch').onclick = async ()=>{ gallery.mode='catchmind'; await saveGallery(id, gallery); renderOwner(id, key); };
-  document.getElementById('modeTopic').onclick = async ()=>{ gallery.mode='topic'; await saveGallery(id, gallery); renderOwner(id, key); };
-  document.getElementById('setTopicBtn').onclick = async ()=>{
-    const v = document.getElementById('topicInput').value.trim();
-    if(!v) return;
-    gallery.topic = v; await saveGallery(id, gallery); renderOwner(id, key);
+
+  document.getElementById('saveSettingBtn').onclick = async ()=>{
+    gallery.title = document.getElementById('galleryTitle').value.trim() || '나만의 갤러리';
+    gallery.is_public = document.getElementById('galleryPublic').value === 'true';
+    await saveGallery(id, gallery);
+    alert('설정이 저장되었습니다.');
+  };
+
+  document.getElementById('deleteGalleryBtn').onclick = async ()=>{
+    if(confirm('정말로 이 갤러리와 모든 그림을 삭제하시겠습니까? 이 작업은 복구할 수 없습니다.')){
+      await deleteGallery(id);
+      localStorage.removeItem('my-gallery-id');
+      localStorage.removeItem('my-gallery-key');
+      alert('갤러리가 삭제되었습니다.');
+      location.hash = '';
+    }
+  };
+
+  document.getElementById('sortSelect').onchange = (e)=>{
+    currentSort = e.target.value;
+    refreshFeed();
   };
 
   async function refreshFeed(){
-    if(document.activeElement && document.activeElement.classList.contains('guessInput')) return;
+    if(document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
 
     const freshGallery = await loadGallery(id);
     const bannedArr = freshGallery ? (freshGallery.banned_visitors || []) : [];
     
+    // 밴 목록 업데이트
     const bannedBox = document.getElementById('bannedList');
     if(bannedBox){
-      if(bannedArr.length === 0){
-        bannedBox.innerHTML = '<span class="small">차단된 플레이어가 없습니다.</span>';
-      } else {
+      if(bannedArr.length === 0) bannedBox.innerHTML = '<span class="small">차단된 유저가 없습니다.</span>';
+      else {
         bannedBox.innerHTML = bannedArr.map(vid=>`
           <div class="row" style="margin-bottom:4px; justify-content:space-between; background:#fff0f5; padding:4px 8px; border-radius:6px;">
             <span>🚫 ID: ${vid.slice(0,8)}...</span>
-            <button class="ghost unbanBtn" data-vid="${vid}" style="font-size:11px; padding:2px 6px;">밴 해제</button>
+            <button class="ghost unbanBtn" data-vid="${vid}" style="font-size:11px; padding:2px 6px;">차단 해제</button>
           </div>
         `).join('');
-
         bannedBox.querySelectorAll('.unbanBtn').forEach(btn=>{
           btn.onclick = async ()=>{
-            const vid = btn.dataset.vid;
-            freshGallery.banned_visitors = freshGallery.banned_visitors.filter(x=>x!==vid);
+            freshGallery.banned_visitors = freshGallery.banned_visitors.filter(x=>x!==btn.dataset.vid);
             await saveGallery(id, freshGallery);
             refreshFeed();
           };
@@ -586,89 +676,82 @@ async function renderOwner(id, key){
       }
     }
 
-    const subs = await loadSubs(id);
+    let subs = await loadSubs(id);
     const feed = document.getElementById('subFeed');
     if(!feed) return;
-    if(subs.length===0){ feed.innerHTML = '<span class="small">아직 그림이 없어요. 방문자 링크를 공유해보세요!</span>'; return; }
-    
-    const sortedSubs = subs.slice().sort((a,b)=>(b.pinned?1:0) - (a.pinned?1:0));
+    if(subs.length === 0){ feed.innerHTML = '<span class="small">아직 업로드된 그림이 없습니다.</span>'; return; }
 
-    feed.innerHTML = sortedSubs.map(s=>{
+    // 정렬 로직
+    subs.sort((a,b)=>{
+      if(b.pinned !== a.pinned) return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
+      if(currentSort === 'popular') return (b.likes||0) - (a.likes||0);
+      if(currentSort === 'newest') return new Date(b.created_at) - new Date(a.created_at);
+      if(currentSort === 'oldest') return new Date(a.created_at) - new Date(b.created_at);
+    });
+
+    let html = '';
+    for(const s of subs){
       const isBanned = bannedArr.includes(s.visitor_id);
-      return `
-      <div class="thumb-card ${s.pinned ? 'pinned-card' : ''}" data-sid="${s.id}" data-vid="${s.visitor_id}">
-        <span class="author">👤 ${escapeHtml(s.author || '익명')}</span>
-        ${s.pinned ? '<span class="badge pinned">📌 고정됨</span>' : ''}
-        ${s.hidden ? '<span class="badge hidden">🔒 비공개</span>' : ''}
-        ${isBanned ? '<span class="badge banned">🚫 밴됨</span>' : ''}
-        <img src="${s.image}" onclick="openModal('${s.image}', '${escapeHtml(s.author || '익명')}님의 작품')">
-        ${gallery.mode==='catchmind' ? (
-          s.correct
-            ? `<span class="badge correct">✅ 맞춤: ${escapeHtml(s.topic)}</span>`
-            : `<span class="badge pending">🤔 맞히는 중</span>
-               <div class="guess-row">
-                 <input type="text" placeholder="정답 입력" class="guessInput" style="font-size:12px; padding:6px;">
-                 <button class="guessBtn" style="padding:6px 10px; font-size:12px;">맞히기</button>
-               </div>
-               <div class="msg"></div>`
-        ) : `<span class="small">❤️ ${s.likes||0}</span>`}
-        
-        <div class="admin-actions">
-          <button class="ghost pinBtn">${s.pinned ? '📌 해제' : '📌 고정'}</button>
-          <button class="ghost hideBtn">${s.hidden ? '👁️ 공개' : '🔒 비공개'}</button>
-          <button class="danger deleteBtn">🗑️ 삭제</button>
-          ${!isBanned ? `<button class="danger banBtn" style="background:#444;">🚫 밴</button>` : ''}
-        </div>
-      </div>
-    `}).join('');
+      const isCover = freshGallery.cover_image === s.image;
+      const comments = await loadComments(s.id);
 
+      html += `
+        <div class="thumb-card ${s.pinned ? 'pinned-card' : ''}" data-sid="${s.id}" data-vid="${s.visitor_id}">
+          <span class="author">👤 ${escapeHtml(s.author || '익명')}</span>
+          ${s.pinned ? '<span class="badge pinned">📌 고정됨</span>' : ''}
+          ${s.hidden ? '<span class="badge hidden">🔒 비공개</span>' : ''}
+          ${isCover ? '<span class="badge public">🖼️ 대표 이미지</span>' : ''}
+          ${isBanned ? '<span class="badge private">🚫 밴됨</span>' : ''}
+          <img src="${s.image}" onclick="openModal('${s.image}', '${escapeHtml(s.author || '익명')}님의 작품')">
+          <div class="small" style="margin-top:4px;">❤️ 좋아요 ${s.likes||0}개</div>
+          
+          <div class="admin-actions">
+            <button class="ghost setCoverBtn">${isCover ? '🖼️ 대표 해제' : '🖼️ 대표 설정'}</button>
+            <button class="ghost pinBtn">${s.pinned ? '📌 고정 해제' : '📌 고정'}</button>
+            <button class="ghost hideBtn">${s.hidden ? '👁️ 공개' : '🔒 비공개'}</button>
+            <button class="danger deleteBtn">🗑️ 삭제</button>
+            ${!isBanned ? `<button class="danger banBtn" style="background:#444;">🚫 밴</button>` : ''}
+          </div>
+
+          <!-- 댓글 목록 -->
+          <div class="comment-section">
+            <div class="comment-list">
+              ${comments.length === 0 ? '<div class="small" style="color:#aaa;">댓글이 없습니다.</div>' : 
+                comments.map(c=>`<div class="comment-item"><span class="c-author">${escapeHtml(c.author)}:</span> ${escapeHtml(c.content)}</div>`).join('')
+              }
+            </div>
+          </div>
+        </div>
+      `;
+    }
+    feed.innerHTML = html;
+
+    // 이벤트 바인딩
     feed.querySelectorAll('.thumb-card').forEach(card=>{
       const sid = card.dataset.sid;
       const vid = card.dataset.vid;
-      
-      const guessBtn = card.querySelector('.guessBtn');
-      if(guessBtn){
-        guessBtn.onclick = async ()=>{
-          const guessVal = card.querySelector('.guessInput').value.trim();
-          const msg = card.querySelector('.msg');
-          if(!guessVal) return;
-          const fresh = await loadSubs(id);
-          const target = fresh.find(x=>x.id===sid);
-          if(!target) return;
-          if(target.topic.trim().toLowerCase() === guessVal.toLowerCase()){
-            target.correct = true;
-            await updateSub(target);
-            msg.textContent = '정답이에요! 🎉'; msg.className='msg ok';
-            setTimeout(refreshFeed, 600);
-          } else {
-            msg.textContent = '아쉬워요, 다시 시도해보세요.'; msg.className='msg no';
-          }
-        };
-      }
 
-      card.querySelector('.pinBtn').onclick = async ()=>{
-        const fresh = await loadSubs(id);
-        const target = fresh.find(x=>x.id===sid);
-        if(target){ target.pinned = !target.pinned; await updateSub(target); refreshFeed(); }
-      };
-
-      card.querySelector('.hideBtn').onclick = async ()=>{
-        const fresh = await loadSubs(id);
-        const target = fresh.find(x=>x.id===sid);
-        if(target){ target.hidden = !target.hidden; await updateSub(target); refreshFeed(); }
-      };
-
-      card.querySelector('.deleteBtn').onclick = async ()=>{
-        if(!confirm('이 그림을 정말 삭제할까요?')) return;
-        await deleteSub(sid);
+      card.querySelector('.setCoverBtn').onclick = async ()=>{
+        const target = subs.find(x=>x.id===sid);
+        freshGallery.cover_image = (freshGallery.cover_image === target.image) ? '' : target.image;
+        await saveGallery(id, freshGallery);
         refreshFeed();
       };
-
+      card.querySelector('.pinBtn').onclick = async ()=>{
+        const target = subs.find(x=>x.id===sid);
+        target.pinned = !target.pinned; await updateSub(target); refreshFeed();
+      };
+      card.querySelector('.hideBtn').onclick = async ()=>{
+        const target = subs.find(x=>x.id===sid);
+        target.hidden = !target.hidden; await updateSub(target); refreshFeed();
+      };
+      card.querySelector('.deleteBtn').onclick = async ()=>{
+        if(confirm('이 그림을 삭제하시겠습니까?')) { await deleteSub(sid); refreshFeed(); }
+      };
       const banBtn = card.querySelector('.banBtn');
       if(banBtn){
         banBtn.onclick = async ()=>{
-          if(!confirm('이 유저를 정말 차단(밴)하시겠습니까?\n이 유저는 더 이상 그림을 올릴 수 없게 됩니다.')) return;
-          if(!freshGallery.banned_visitors.includes(vid)){
+          if(confirm('이 유저를 차단하시겠습니까?')){
             freshGallery.banned_visitors.push(vid);
             await saveGallery(id, freshGallery);
             refreshFeed();
@@ -677,162 +760,190 @@ async function renderOwner(id, key){
       }
     });
   }
+
   refreshFeed();
-  pollTimer = setInterval(refreshFeed, 3000);
+  pollTimer = setInterval(refreshFeed, 4000);
 }
 
 // ---------------- 방문자 화면 ----------------
 async function renderVisitor(id){
   const gallery = await loadGallery(id);
   if(!gallery){
-    APP.innerHTML = `<div class="card">존재하지 않는 갤러리예요. <a class="home-link" href="#">홈으로</a></div>`;
+    APP.innerHTML = `<div class="card">존재하지 않는 갤러리입니다. <a class="home-link" href="#">홈으로</a></div>`;
     return;
   }
+
   const myVid = await getVisitorId();
   const savedName = localStorage.getItem('visitor-nickname') || '';
   const isBanned = (gallery.banned_visitors || []).includes(myVid);
+  let currentSort = 'popular';
 
   APP.innerHTML = `
-    <div class="topbar"><h1>🎨 익명 그림 갤러리</h1><a class="home-link" href="#">내 갤러리도 만들기</a></div>
+    <div class="topbar">
+      <h1>🎨 ${escapeHtml(gallery.title)}</h1>
+      <a class="home-link" href="#">내 갤러리 만들기</a>
+    </div>
+
     ${isBanned ? `
       <div class="card" style="background:#ffdce0; border-color:var(--bad);">
         <h2 style="color:var(--bad); margin:0;">🚫 갤러리 이용이 제한되었습니다.</h2>
-        <p class="small" style="color:#555; margin-top:6px;">관리자에 의해 해당 갤러리에서 차단(밴) 처리되어 그림을 제출할 수 없습니다.</p>
-      </div>
-    ` : (gallery.mode==='catchmind' ? `
-      <div class="card">
-        <h2>🕵️ 캐치마인드 모드</h2>
-        <p class="sub">주제를 몰래 정하고 그림을 그리면, 갤러리 주인이 맞혀볼 거예요!</p>
-        <div class="row" style="margin-bottom:8px;">
-          <input type="text" id="authorName" placeholder="내 닉네임 (선택사항)" value="${escapeHtml(savedName)}">
-          <input type="text" id="secretTopic" placeholder="이 그림의 주제 (예: 판다)">
-        </div>
-        <canvas id="draw"></canvas>
-        ${brushControlsHtml()}
-        <div class="row" style="margin-top:10px;">
-          <button id="submitBtn">제출하기</button>
-        </div>
-        <div class="msg" id="submitMsg"></div>
+        <p class="small" style="color:#555; margin-top:6px;">관리자에 의해 차단(밴)되어 그림 제출 및 댓글 생성이 안 됩니다.</p>
       </div>
     ` : `
       <div class="card">
-        <h2>🎯 오늘의 주제: ${gallery.topic ? escapeHtml(gallery.topic) : '(아직 주인이 주제를 정하지 않았어요)'}</h2>
+        <h2>✏️ 캔버스에 그림 그리기</h2>
         <div class="row" style="margin-bottom:8px;">
           <input type="text" id="authorName" placeholder="내 닉네임 (선택사항)" value="${escapeHtml(savedName)}">
         </div>
         <canvas id="draw"></canvas>
         ${brushControlsHtml()}
         <div class="row" style="margin-top:10px;">
-          <button id="submitBtn" ${gallery.topic?'':'disabled'}>제출하기</button>
+          <button id="submitBtn">작품 등록하기</button>
         </div>
         <div class="msg" id="submitMsg"></div>
       </div>
-    `)}
-    <h2>다른 사람들의 그림</h2>
+    `}
+
+    <div class="row" style="justify-content:space-between; margin:16px 0 8px;">
+      <h2>작품 목록</h2>
+      <select id="sortSelect">
+        <option value="popular">🔥 인기순</option>
+        <option value="newest">✨ 최신순</option>
+        <option value="oldest">⏳ 오래된순</option>
+      </select>
+    </div>
+
     <div id="subFeed" class="grid"><span class="small">불러오는 중...</span></div>
   `;
 
   if(!isBanned){
     const canvas = document.getElementById('draw');
-    setupCanvas(canvas);
-    bindBrushControls(document);
+    setupCanvas(canvas, id);
+    bindBrushControls(document, id);
 
     document.getElementById('submitBtn').onclick = async ()=>{
       const msg = document.getElementById('submitMsg');
-      msg.textContent=''; 
+      msg.textContent = ''; 
 
       const lastSubTime = localStorage.getItem('last-sub-time');
       const now = Date.now();
       if(lastSubTime && (now - parseInt(lastSubTime)) < 30000){
-        const remain = Math.ceil((30000 - (now - parseInt(lastSubTime))) / 1000);
-        msg.textContent = `도배 방지: ${remain}초 후에 다시 제출할 수 있습니다.`;
-        msg.className = 'msg no';
-        return;
+        msg.textContent = `도배 방지: ${Math.ceil((30000 - (now - parseInt(lastSubTime))) / 1000)}초 후 다시 시도해주세요.`;
+        msg.className = 'msg no'; return;
       }
 
       const fresh = await loadGallery(id);
-      if((fresh.banned_visitors||[]).includes(myVid)){
-        alert('차단된 계정입니다.'); location.reload(); return;
-      }
+      if((fresh.banned_visitors||[]).includes(myVid)){ alert('차단된 계정입니다.'); location.reload(); return; }
 
       const image = canvas.toDataURL('image/jpeg', 0.7);
       const author = document.getElementById('authorName').value.trim() || '익명';
       localStorage.setItem('visitor-nickname', author);
 
-      if(fresh.mode==='catchmind'){
-        const topic = document.getElementById('secretTopic').value.trim();
-        if(!topic){ msg.textContent='주제를 먼저 입력해주세요.'; msg.className='msg no'; return; }
-        await addSub(id, { id: genId(10), author, topic, image, correct:false, pinned:false, hidden:false });
-        document.getElementById('secretTopic').value='';
-      } else {
-        if(!fresh.topic){ msg.textContent='아직 주제가 정해지지 않았어요.'; msg.className='msg no'; return; }
-        await addSub(id, { id: genId(10), author, image, likes:0, likedBy:[], pinned:false, hidden:false });
-      }
-      
+      await addSub(id, { id: genId(10), author, image });
       localStorage.setItem('last-sub-time', Date.now().toString());
-      clearCanvas(canvas);
-      msg.textContent = '제출 완료! 🎉'; msg.className='msg ok';
+      localStorage.removeItem(`draft-canvas-${id}`);
+      
+      clearCanvas(canvas, id);
+      msg.textContent = '그림 제출 완료! 🎉'; msg.className='msg ok';
       refreshFeed();
     };
   }
 
+  document.getElementById('sortSelect').onchange = (e)=>{
+    currentSort = e.target.value;
+    refreshFeed();
+  };
+
   async function refreshFeed(){
-    const g2 = await loadGallery(id);
+    if(document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
+
     let subs = await loadSubs(id);
     subs = subs.filter(s=>!s.hidden);
 
     const feed = document.getElementById('subFeed');
     if(!feed) return;
-    if(subs.length===0){ feed.innerHTML = '<span class="small">아직 그림이 없어요. 첫 그림을 그려보세요!</span>'; return; }
-    
-    const sortedSubs = subs.slice().sort((a,b)=>(b.pinned?1:0) - (a.pinned?1:0));
+    if(subs.length === 0){ feed.innerHTML = '<span class="small">아직 등록된 그림이 없습니다. 첫 그림을 그려보세요!</span>'; return; }
 
-    feed.innerHTML = sortedSubs.map(s=>{
+    // 정렬 로직
+    subs.sort((a,b)=>{
+      if(b.pinned !== a.pinned) return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
+      if(currentSort === 'popular') return (b.likes||0) - (a.likes||0);
+      if(currentSort === 'newest') return new Date(b.created_at) - new Date(a.created_at);
+      if(currentSort === 'oldest') return new Date(a.created_at) - new Date(b.created_at);
+    });
+
+    let html = '';
+    for(const s of subs){
       const isMine = s.visitor_id === myVid;
-      return `
+      const comments = await loadComments(s.id);
+
+      html += `
         <div class="thumb-card ${s.pinned ? 'pinned-card' : ''}" data-sid="${s.id}">
           <span class="author">👤 ${escapeHtml(s.author || '익명')} ${isMine?'(나)':''}</span>
           ${s.pinned ? '<span class="badge pinned">📌 고정됨</span>' : ''}
           <img src="${s.image}" onclick="openModal('${s.image}', '${escapeHtml(s.author || '익명')}님의 작품')">
-          ${g2.mode==='catchmind' 
-            ? (s.correct ? `<span class="badge correct">✅ 정답: ${escapeHtml(s.topic)}</span>` : `<span class="badge pending">🤔 맞히는 중</span>`)
-            : `<button class="like-btn" data-sid="${s.id}">🤍 좋아요 (${s.likes||0})</button>`
-          }
+          <button class="like-btn" data-sid="${s.id}">🤍 좋아요 (${s.likes||0})</button>
+          
           ${isMine ? `<div class="admin-actions"><button class="danger myDeleteBtn">🗑️ 삭제</button></div>` : ''}
+
+          <!-- 댓글 기능 -->
+          <div class="comment-section">
+            <div class="comment-list">
+              ${comments.length === 0 ? '<div class="small" style="color:#aaa;">첫 댓글을 달아보세요!</div>' : 
+                comments.map(c=>`<div class="comment-item"><span class="c-author">${escapeHtml(c.author)}:</span> ${escapeHtml(c.content)}</div>`).join('')
+              }
+            </div>
+            ${!isBanned ? `
+              <div class="row" style="gap:4px;">
+                <input type="text" placeholder="댓글 입력..." class="commentInput" style="font-size:11px; padding:4px 6px; flex:1;">
+                <button class="commentBtn" style="padding:4px 8px; font-size:11px;">작성</button>
+              </div>
+            ` : ''}
+          </div>
         </div>
       `;
-    }).join('');
+    }
+    feed.innerHTML = html;
 
+    // 댓글 및 이벤트 바인딩
     feed.querySelectorAll('.thumb-card').forEach(card=>{
       const sid = card.dataset.sid;
-      
+
       const myDelBtn = card.querySelector('.myDeleteBtn');
       if(myDelBtn){
         myDelBtn.onclick = async ()=>{
-          if(!confirm('내가 그린 그림을 삭제할까요?')) return;
-          await deleteSub(sid);
-          refreshFeed();
+          if(confirm('내가 그린 그림을 삭제할까요?')){ await deleteSub(sid); refreshFeed(); }
         };
       }
 
-      const likeBtn = card.querySelector('.like-btn');
-      if(likeBtn){
-        likeBtn.onclick = async ()=>{
-          const freshSubs = await loadSubs(id);
-          const target = freshSubs.find(x=>x.id===sid);
-          if(!target) return;
-          target.likedBy = target.likedBy || [];
-          if(target.likedBy.includes(myVid)) return;
-          target.likedBy.push(myVid);
-          target.likes = (target.likes||0)+1;
-          await updateSub(target);
+      card.querySelector('.like-btn').onclick = async ()=>{
+        const target = subs.find(x=>x.id===sid);
+        if(!target) return;
+        target.likedBy = target.likedBy || [];
+        if(target.likedBy.includes(myVid)) return;
+        target.likedBy.push(myVid);
+        target.likes = (target.likes||0)+1;
+        await updateSub(target);
+        refreshFeed();
+      };
+
+      const commentBtn = card.querySelector('.commentBtn');
+      if(commentBtn){
+        commentBtn.onclick = async ()=>{
+          const input = card.querySelector('.commentInput');
+          const val = input.value.trim();
+          if(!val) return;
+          const author = localStorage.getItem('visitor-nickname') || '익명';
+          await addComment(sid, author, val);
+          input.value = '';
           refreshFeed();
         };
       }
     });
   }
+
   refreshFeed();
-  pollTimer = setInterval(refreshFeed, 3000);
+  pollTimer = setInterval(refreshFeed, 4000);
 }
 
 route();
